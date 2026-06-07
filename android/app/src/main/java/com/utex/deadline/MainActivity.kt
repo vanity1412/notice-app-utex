@@ -126,7 +126,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply {
             addView(eventsContainer)
         }
-        root.addView(scroll, LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         setContentView(root)
         updateLastSyncStatus()
