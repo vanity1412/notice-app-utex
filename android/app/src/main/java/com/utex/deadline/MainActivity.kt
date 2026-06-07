@@ -268,12 +268,19 @@ class MainActivity : Activity() {
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         }, LinearLayout.LayoutParams(0, wrap(), 1f))
+        titleRow.addView(outlineButton("Hướng dẫn").apply {
+            setOnClickListener { showGuideTab() }
+        }, LinearLayout.LayoutParams(dp(104), dp(36)).apply {
+            marginStart = dp(8)
+        })
         if (hasUrl) {
             titleRow.addView(chip("Thu gọn", blue, Color.rgb(226, 238, 252)).apply {
                 setOnClickListener {
                     connectionExpanded = false
                     showCalendarTab()
                 }
+            }, LinearLayout.LayoutParams(wrap(), dp(36)).apply {
+                marginStart = dp(8)
             })
         }
         panel.addView(titleRow)
@@ -344,12 +351,18 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(0, wrap(), 1f))
 
             addView(TextView(this@MainActivity).apply {
-                text = "Đã kết nối - chạm để chỉnh"
+                text = "Đã kết nối"
                 textSize = 12f
                 setTextColor(green)
                 setTypeface(Typeface.DEFAULT, Typeface.BOLD)
                 gravity = Gravity.END
+            }, LinearLayout.LayoutParams(wrap(), wrap()).apply {
+                marginEnd = dp(8)
             })
+
+            addView(outlineButton("Hướng dẫn").apply {
+                setOnClickListener { showGuideTab() }
+            }, LinearLayout.LayoutParams(dp(100), dp(36)))
         }
     }
 
@@ -367,7 +380,7 @@ class MainActivity : Activity() {
         })
         addSpacer(panel, 6)
         panel.addView(TextView(this).apply {
-            text = "1. Vào trang xuất lịch Moodle\n2. Chọn lịch cần thông báo và bấm Lấy địa chỉ mạng của lịch\n3. Copy URL, dán vào app rồi Lưu & đồng bộ"
+            text = "1. Copy link https://utexlms.hcmute.edu.vn/calendar/export.php? bằng nút Copy bên dưới.\n2. Mở web trường để có quyền truy cập Moodle.\n3. Chọn lịch muốn thông báo, bấm Lấy địa chỉ mạng của lịch.\n4. Copy Calendar URL hiện ra, quay lại app dán vào Kết nối Moodle."
             textSize = 12f
             setTextColor(muted)
             setLineSpacing(0f, 1.08f)
@@ -391,7 +404,7 @@ class MainActivity : Activity() {
 
         addSpacer(panel, 8)
         panel.addView(TextView(this).apply {
-            text = "Mở web trường để có quyền truy cập, sau đó copy link Calendar URL:"
+            text = "Link trang xuất lịch Moodle:"
             textSize = 12f
             setTextColor(muted)
         })
