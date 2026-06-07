@@ -380,7 +380,7 @@ class MainActivity : Activity() {
         })
         addSpacer(panel, 6)
         panel.addView(TextView(this).apply {
-            text = "1. Copy link https://utexlms.hcmute.edu.vn/calendar/export.php? bằng nút Copy bên dưới.\n2. Mở web trường để có quyền truy cập Moodle.\n3. Chọn lịch muốn thông báo, bấm Lấy địa chỉ mạng của lịch.\n4. Copy Calendar URL hiện ra, quay lại app dán vào Kết nối Moodle."
+            text = "1. Copy link ở dưới: https://utexlms.hcmute.edu.vn/calendar/export.php?\n2. Dán link vào trình duyệt đã đăng nhập UTExLMS để có quyền truy cập.\n3. Chọn lịch muốn thông báo, bấm Lấy địa chỉ mạng của lịch.\n4. Copy Calendar URL hiện ra, quay lại app dán vào Kết nối Moodle rồi Lưu & đồng bộ."
             textSize = 12f
             setTextColor(muted)
             setLineSpacing(0f, 1.08f)
