@@ -2,7 +2,9 @@ package com.utex.deadline
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
@@ -11,6 +13,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
@@ -22,6 +25,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.Instant
@@ -31,6 +35,8 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
+    private val moodleExportUrl = "https://utexlms.hcmute.edu.vn/calendar/export.php"
+
     private lateinit var urlInput: EditText
     private lateinit var statusText: TextView
     private lateinit var eventsContainer: LinearLayout
@@ -180,6 +186,25 @@ class MainActivity : Activity() {
         }
         panel.addView(urlInput, LinearLayout.LayoutParams(match(), wrap()))
 
+        val quickActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(10), 0, 0)
+        }
+        val openMoodleButton = secondaryButton("Mở Moodle").apply {
+            setOnClickListener { openMoodleExportPage() }
+        }
+        quickActions.addView(openMoodleButton, LinearLayout.LayoutParams(0, dp(44), 1f))
+
+        val pasteButton = outlineButton("Dán clipboard").apply {
+            setOnClickListener { pasteUrlFromClipboard() }
+        }
+        val pasteLp = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+            marginStart = dp(8)
+        }
+        quickActions.addView(pasteButton, pasteLp)
+        panel.addView(quickActions)
+
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -218,6 +243,43 @@ class MainActivity : Activity() {
         }
         panel.addView(resetButton, resetLp)
         return panel
+    }
+
+    private fun openMoodleExportPage() {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(moodleExportUrl))
+        try {
+            startActivity(intent)
+            setStatus("Đăng nhập Moodle trong trình duyệt, bấm Copy URL rồi quay lại app.", StatusType.INFO)
+        } catch (_: Exception) {
+            setStatus("Không mở được trình duyệt trên máy này.", StatusType.ERROR)
+        }
+    }
+
+    private fun pasteUrlFromClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = clipboard.primaryClip
+        val text = clip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(this)
+            ?.toString()
+            ?.trim()
+            .orEmpty()
+
+        if (text.isBlank()) {
+            setStatus("Clipboard đang trống. Hãy copy Calendar URL từ Moodle trước.", StatusType.ERROR)
+            return
+        }
+
+        urlInput.setText(text)
+        urlInput.setSelection(urlInput.text.length)
+        EventStore.setIcalUrl(this, text)
+
+        if (text.contains("export_execute.php", ignoreCase = true)) {
+            Toast.makeText(this, "Đã dán iCal URL", Toast.LENGTH_SHORT).show()
+            setStatus("Đã dán Calendar URL. Bấm Lưu & đồng bộ để tải lịch.", StatusType.SUCCESS)
+        } else {
+            setStatus("Đã dán clipboard, nhưng link chưa giống Calendar URL export_execute.php.", StatusType.INFO)
+        }
     }
 
     private fun sectionHeader(): View {
