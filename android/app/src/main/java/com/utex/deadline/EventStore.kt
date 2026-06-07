@@ -12,6 +12,9 @@ object EventStore {
     private const val KEY_LAST_SYNC = "last_sync"
     private const val KEY_DAILY_SUMMARY_ENABLED = "daily_summary_enabled"
     private const val KEY_DAILY_SUMMARY_HOUR = "daily_summary_hour"
+    private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute"
+    private const val KEY_DAILY_SUMMARY_DAYS = "daily_summary_days"
+    const val ALL_DAYS_MASK = 0b1111111
 
     fun getIcalUrl(context: Context): String {
         return prefs(context).getString(KEY_ICAL_URL, "").orEmpty()
@@ -41,11 +44,34 @@ object EventStore {
         return prefs(context).getInt(KEY_DAILY_SUMMARY_HOUR, 7)
     }
 
-    fun setDailySummaryHour(context: Context, hour: Int) {
+    fun getDailySummaryMinute(context: Context): Int {
+        return prefs(context).getInt(KEY_DAILY_SUMMARY_MINUTE, 0)
+    }
+
+    fun setDailySummaryTime(context: Context, hour: Int, minute: Int) {
         prefs(context).edit()
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
             .putInt(KEY_DAILY_SUMMARY_HOUR, hour.coerceIn(0, 23))
+            .putInt(KEY_DAILY_SUMMARY_MINUTE, minute.coerceIn(0, 59))
             .apply()
+    }
+
+    fun getDailySummaryDaysMask(context: Context): Int {
+        return prefs(context).getInt(KEY_DAILY_SUMMARY_DAYS, ALL_DAYS_MASK).takeIf { it != 0 } ?: ALL_DAYS_MASK
+    }
+
+    fun setDailySummaryDaysMask(context: Context, daysMask: Int) {
+        val safeMask = daysMask and ALL_DAYS_MASK
+        prefs(context).edit()
+            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, safeMask != 0)
+            .putInt(KEY_DAILY_SUMMARY_DAYS, safeMask)
+            .apply()
+    }
+
+    fun isDailySummaryAllowedToday(context: Context): Boolean {
+        val dayValue = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).dayOfWeek.value
+        val bit = 1 shl (dayValue - 1)
+        return getDailySummaryDaysMask(context) and bit != 0
     }
 
     fun loadEvents(context: Context): List<DeadlineEvent> {

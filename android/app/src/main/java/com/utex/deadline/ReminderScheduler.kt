@@ -10,8 +10,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.time.Duration
-import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 object ReminderScheduler {
@@ -57,15 +57,19 @@ object ReminderScheduler {
             return
         }
 
-        val delayMillis = millisUntilNextDailySummary(EventStore.getDailySummaryHour(context))
-        val request = PeriodicWorkRequestBuilder<DailySummaryWorker>(1, TimeUnit.DAYS)
+        val delayMillis = millisUntilNextDailySummary(
+            hour = EventStore.getDailySummaryHour(context),
+            minute = EventStore.getDailySummaryMinute(context),
+            daysMask = EventStore.getDailySummaryDaysMask(context)
+        )
+        val request = OneTimeWorkRequestBuilder<DailySummaryWorker>()
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
             .addTag("ute-deadline-daily-summary")
             .build()
 
-        manager.enqueueUniquePeriodicWork(
+        manager.enqueueUniqueWork(
             "ute-deadline-daily-summary",
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingWorkPolicy.REPLACE,
             request
         )
     }
@@ -97,12 +101,23 @@ object ReminderScheduler {
         }
     }
 
-    private fun millisUntilNextDailySummary(hour: Int): Long {
-        val now = java.time.ZonedDateTime.now(localZone)
-        var next = LocalDate.now(localZone).atTime(hour.coerceIn(0, 23), 0).atZone(localZone)
-        if (!next.isAfter(now)) {
-            next = next.plusDays(1)
+    private fun millisUntilNextDailySummary(hour: Int, minute: Int, daysMask: Int): Long {
+        val now = ZonedDateTime.now(localZone)
+        val safeHour = hour.coerceIn(0, 23)
+        val safeMinute = minute.coerceIn(0, 59)
+        val safeDays = daysMask and EventStore.ALL_DAYS_MASK
+
+        for (offset in 0..7) {
+            val candidate = now.plusDays(offset.toLong())
+                .withHour(safeHour)
+                .withMinute(safeMinute)
+                .withSecond(0)
+                .withNano(0)
+            val dayBit = 1 shl (candidate.dayOfWeek.value - 1)
+            if (safeDays and dayBit != 0 && candidate.isAfter(now)) {
+                return Duration.between(now, candidate).toMillis().coerceAtLeast(60_000L)
+            }
         }
-        return Duration.between(now, next).toMillis().coerceAtLeast(60_000L)
+        return TimeUnit.DAYS.toMillis(1)
     }
 }

@@ -19,7 +19,7 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 - Thông báo khi phát hiện deadline mới.
 - Nhắc trước hạn: 7 ngày, 3 ngày, 1 ngày, 2 giờ.
 - Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 7:00.
-- Có thể đổi giờ thông báo tổng hợp sang 7:00, 12:00, 20:00 hoặc tắt trong app.
+- Có thể chọn giờ/phút và ngày trong tuần để nhận thông báo tổng hợp.
 - Không lưu mật khẩu Moodle.
 - Không dùng `MoodleSession`/cookie trong app.
 
@@ -67,7 +67,10 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 ## Cài Đặt Thông Báo
 
 - Mặc định app gửi thông báo tổng hợp **mỗi ngày 1 lần lúc 7:00**.
-- Trong app, vào mục **Cài đặt thông báo** để đổi sang **7:00**, **12:00**, **20:00** hoặc **Tắt**.
+- Trong app, vào tab **Hướng dẫn** -> **Cài đặt thông báo**.
+- Bấm **Chọn giờ** để đặt giờ/phút cụ thể.
+- Bấm các nút **T2, T3, T4, T5, T6, T7, CN** để chọn ngày nhận thông báo.
+- Bấm **Mỗi ngày** để bật đủ cả tuần, hoặc **Tắt** để tắt thông báo tổng hợp.
 - Các nhắc trước hạn riêng lẻ vẫn được giữ: 7 ngày, 3 ngày, 1 ngày và 2 giờ trước deadline.
 - Nếu không nhận được thông báo, kiểm tra quyền thông báo của Android cho app **UTE Notice**.
 

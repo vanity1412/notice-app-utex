@@ -2,6 +2,7 @@ package com.utex.deadline
 
 import android.Manifest
 import android.app.Activity
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -414,28 +415,54 @@ class MainActivity : Activity() {
         }
         panel.addView(dailySummaryText)
 
-        val row = LinearLayout(this).apply {
+        val timeRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        row.addView(timeButton("7:00", 7), LinearLayout.LayoutParams(0, dp(40), 1f))
-        row.addView(timeButton("12:00", 12), LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+        timeRow.addView(primaryButton("Chọn giờ").apply {
+            setOnClickListener { showDailyTimePicker() }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        timeRow.addView(secondaryButton("Mỗi ngày").apply {
+            setOnClickListener {
+                EventStore.setDailySummaryDaysMask(this@MainActivity, EventStore.ALL_DAYS_MASK)
+                ReminderScheduler.scheduleDailySummary(this@MainActivity)
+                showGuideTab()
+            }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
         })
-        row.addView(timeButton("20:00", 20), LinearLayout.LayoutParams(0, dp(40), 1f).apply {
-            marginStart = dp(6)
-        })
-        row.addView(outlineButton("Tắt").apply {
+        timeRow.addView(outlineButton("Tắt").apply {
             setOnClickListener {
                 EventStore.setDailySummaryEnabled(this@MainActivity, false)
                 ReminderScheduler.scheduleDailySummary(this@MainActivity)
-                refreshDailySummaryText()
-                setStatus("Đã tắt thông báo tổng hợp hằng ngày.", StatusType.INFO)
+                showGuideTab()
             }
-        }, LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
         })
-        panel.addView(row)
+        panel.addView(timeRow)
+
+        addSpacer(panel, 8)
+        panel.addView(TextView(this).apply {
+            text = "Ngày thông báo"
+            textSize = 12f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        addSpacer(panel, 6)
+
+        panel.addView(daysRow(listOf(
+            DayOption("T2", 0),
+            DayOption("T3", 1),
+            DayOption("T4", 2),
+            DayOption("T5", 3)
+        )))
+        addSpacer(panel, 6)
+        panel.addView(daysRow(listOf(
+            DayOption("T6", 4),
+            DayOption("T7", 5),
+            DayOption("CN", 6)
+        )))
 
         val resetButton = outlineButton("Test lại thông báo deadline mới").apply {
             setOnClickListener {
@@ -449,24 +476,81 @@ class MainActivity : Activity() {
         return panel
     }
 
-    private fun timeButton(label: String, hour: Int): Button {
-        return secondaryButton(label).apply {
+    private fun daysRow(options: List<DayOption>): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        options.forEachIndexed { index, option ->
+            row.addView(dayButton(option), LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+                if (index > 0) marginStart = dp(6)
+            })
+        }
+        return row
+    }
+
+    private fun dayButton(option: DayOption): Button {
+        val mask = EventStore.getDailySummaryDaysMask(this)
+        val bit = 1 shl option.bitIndex
+        val selected = EventStore.isDailySummaryEnabled(this) && mask and bit != 0
+        return Button(this).apply {
+            text = option.label
+            textSize = 12f
+            setAllCaps(false)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setTextColor(if (selected) Color.WHITE else blue)
+            background = if (selected) rounded(blue, 8) else rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
             setOnClickListener {
-                EventStore.setDailySummaryHour(this@MainActivity, hour)
+                val currentMask = if (EventStore.isDailySummaryEnabled(this@MainActivity)) {
+                    EventStore.getDailySummaryDaysMask(this@MainActivity)
+                } else {
+                    0
+                }
+                val nextMask = if (currentMask and bit != 0) currentMask and bit.inv() else currentMask or bit
+                EventStore.setDailySummaryDaysMask(this@MainActivity, nextMask)
                 ReminderScheduler.scheduleDailySummary(this@MainActivity)
-                refreshDailySummaryText()
-                setStatus("Đã đặt thông báo tổng hợp mỗi ngày lúc $label.", StatusType.SUCCESS)
+                showGuideTab()
             }
         }
+    }
+
+    private fun showDailyTimePicker() {
+        TimePickerDialog(
+            this,
+            { _, hourOfDay, minute ->
+                EventStore.setDailySummaryTime(this, hourOfDay, minute)
+                if (EventStore.getDailySummaryDaysMask(this) == 0) {
+                    EventStore.setDailySummaryDaysMask(this, EventStore.ALL_DAYS_MASK)
+                }
+                ReminderScheduler.scheduleDailySummary(this)
+                showGuideTab()
+            },
+            EventStore.getDailySummaryHour(this),
+            EventStore.getDailySummaryMinute(this),
+            true
+        ).show()
     }
 
     private fun refreshDailySummaryText() {
         if (!::dailySummaryText.isInitialized) return
         dailySummaryText.text = if (EventStore.isDailySummaryEnabled(this)) {
-            "Mặc định app nhắc tổng hợp mỗi ngày 1 lần lúc ${"%02d:00".format(EventStore.getDailySummaryHour(this))}."
+            "App nhắc tổng hợp lúc ${summaryTimeText()} vào ${summaryDaysText()}."
         } else {
             "Thông báo tổng hợp hằng ngày đang tắt. Nhắc trước hạn vẫn hoạt động."
         }
+    }
+
+    private fun summaryTimeText(): String {
+        return "%02d:%02d".format(EventStore.getDailySummaryHour(this), EventStore.getDailySummaryMinute(this))
+    }
+
+    private fun summaryDaysText(): String {
+        val mask = EventStore.getDailySummaryDaysMask(this)
+        if (mask == EventStore.ALL_DAYS_MASK) return "mỗi ngày"
+        val labels = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+        return labels.filterIndexed { index, _ -> mask and (1 shl index) != 0 }
+            .joinToString(", ")
+            .ifBlank { "chưa chọn ngày" }
     }
 
     private fun openUrl(url: String) {
@@ -796,6 +880,11 @@ class MainActivity : Activity() {
         CALENDAR,
         GUIDE
     }
+
+    private data class DayOption(
+        val label: String,
+        val bitIndex: Int
+    )
 
     private class HcmuteMarkView(context: Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
