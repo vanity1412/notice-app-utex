@@ -8,11 +8,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -25,6 +21,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -220,7 +217,7 @@ class MainActivity : Activity() {
             setPadding(dp(18), dp(18), dp(18), dp(16))
             background = rounded(blue, 0)
         }
-        header.addView(HcmuteMarkView(this), LinearLayout.LayoutParams(dp(70), dp(70)))
+        header.addView(hcmuteLogoView(70), LinearLayout.LayoutParams(dp(70), dp(70)))
 
         val textGroup = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -797,7 +794,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(dp(18), dp(22), dp(18), dp(22))
             background = rounded(card, 8, line, 1)
-            addView(HcmuteMarkView(this@MainActivity), LinearLayout.LayoutParams(dp(58), dp(58)))
+            addView(hcmuteLogoView(58), LinearLayout.LayoutParams(dp(58), dp(58)))
             addSpacer(this, 10)
             addView(TextView(this@MainActivity).apply {
                 text = "Chưa có deadline"
@@ -930,6 +927,17 @@ class MainActivity : Activity() {
         parent.addView(View(this), LinearLayout.LayoutParams(match(), dp(heightDp)))
     }
 
+    private fun hcmuteLogoView(sizeDp: Int): ImageView {
+        return ImageView(this).apply {
+            setImageResource(R.drawable.hcmute_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = rounded(Color.WHITE, sizeDp / 2, Color.argb(70, 255, 255, 255), 1)
+            contentDescription = "Logo HCMUTE"
+        }
+    }
+
     private fun applySystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.statusBarColor = blueDark
@@ -960,51 +968,4 @@ class MainActivity : Activity() {
         val bitIndex: Int
     )
 
-    private class HcmuteMarkView(context: Context) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val rect = RectF()
-        private val flame = Path()
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val size = width.coerceAtMost(height).toFloat()
-            val cx = width / 2f
-            val cy = height / 2f
-            val blue = Color.rgb(0, 82, 156)
-            val red = Color.rgb(218, 37, 41)
-
-            paint.style = Paint.Style.FILL
-            paint.color = Color.WHITE
-            canvas.drawCircle(cx, cy, size * 0.47f, paint)
-
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = size * 0.045f
-            paint.color = blue
-            canvas.drawCircle(cx, cy, size * 0.43f, paint)
-
-            paint.style = Paint.Style.FILL
-            paint.color = blue
-            rect.set(cx - size * 0.23f, cy + size * 0.06f, cx + size * 0.23f, cy + size * 0.19f)
-            canvas.drawRoundRect(rect, size * 0.025f, size * 0.025f, paint)
-            rect.set(cx - size * 0.18f, cy + size * 0.21f, cx + size * 0.18f, cy + size * 0.28f)
-            canvas.drawRoundRect(rect, size * 0.02f, size * 0.02f, paint)
-
-            paint.color = red
-            flame.reset()
-            flame.moveTo(cx, cy - size * 0.29f)
-            flame.cubicTo(cx + size * 0.18f, cy - size * 0.13f, cx + size * 0.13f, cy + size * 0.03f, cx, cy + size * 0.06f)
-            flame.cubicTo(cx - size * 0.15f, cy - size * 0.02f, cx - size * 0.12f, cy - size * 0.18f, cx, cy - size * 0.29f)
-            canvas.drawPath(flame, paint)
-
-            paint.color = Color.WHITE
-            paint.textAlign = Paint.Align.CENTER
-            paint.typeface = Typeface.DEFAULT_BOLD
-            paint.textSize = size * 0.17f
-            canvas.drawText("UTE", cx, cy + size * 0.03f, paint)
-
-            paint.color = blue
-            paint.textSize = size * 0.12f
-            canvas.drawText("HCM-UTE", cx, cy + size * 0.39f, paint)
-        }
-    }
 }
