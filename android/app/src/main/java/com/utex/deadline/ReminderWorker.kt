@@ -17,7 +17,7 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : Worker(app
             description = inputData.getString("description")?.takeIf { it.isNotBlank() }
         )
         val leadText = inputData.getString("leadText") ?: "gần tới hạn"
-        if (startAt > 0L) {
+        if (startAt > 0L && !EventStore.isDone(applicationContext, event.id)) {
             NotificationHelper.notifyReminder(applicationContext, event, leadText)
         }
         return Result.success()

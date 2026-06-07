@@ -17,12 +17,6 @@ import java.util.concurrent.TimeUnit
 object ReminderScheduler {
     private val localZone: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
 
-    private val reminderOffsets = listOf(
-        ReminderOffset("1 ngày trước hạn", 24L * 60L),
-        ReminderOffset("12 giờ trước hạn", 12L * 60L),
-        ReminderOffset("1 giờ trước hạn", 60L)
-    )
-
     fun schedulePeriodicSync(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -46,7 +40,11 @@ object ReminderScheduler {
             .setConstraints(constraints)
             .addTag("ute-deadline-sync")
             .build()
-        WorkManager.getInstance(context).enqueue(request)
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "ute-deadline-immediate-sync",
+            ExistingWorkPolicy.KEEP,
+            request
+        )
     }
 
     fun cancelAll(context: Context) {
@@ -84,6 +82,10 @@ object ReminderScheduler {
     fun scheduleAll(context: Context, events: List<DeadlineEvent>) {
         val now = System.currentTimeMillis()
         val manager = WorkManager.getInstance(context)
+        manager.cancelAllWorkByTag("ute-deadline-reminder")
+        val reminderOffsets = EventStore.getReminderOffsetsMinutes(context).map { minutes ->
+            ReminderOffset(EventStore.reminderLeadLabel(minutes), minutes)
+        }
         events.forEach { event ->
             reminderOffsets.forEach { offset ->
                 val triggerAt = event.startAtMillis - offset.minutes * 60_000L

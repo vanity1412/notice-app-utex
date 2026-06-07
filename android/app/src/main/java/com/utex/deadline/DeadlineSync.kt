@@ -33,7 +33,7 @@ object DeadlineSync {
             EventStore.setLastSync(context, System.currentTimeMillis())
 
             EventStore.enableDailySummaryAfterSetup(context)
-            ReminderScheduler.scheduleAll(context, events)
+            ReminderScheduler.scheduleAll(context, events.filterNot { EventStore.isDone(context, it.id) })
             ReminderScheduler.scheduleDailySummary(context)
 
             if (notifyNew) {

@@ -16,8 +16,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.Editable
 import android.text.InputType
 import android.text.TextUtils
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -30,6 +32,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.text.Normalizer
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -57,6 +60,9 @@ class MainActivity : Activity() {
     private var connectionExpanded = false
     private var eventViewMode = EventViewMode.LIST
     private var visibleMonth: YearMonth? = null
+    private var eventSearchText = ""
+    private var selectedFilter = EventFilter.ALL
+    private var hideDoneEvents = true
 
     private val localZone = ZoneId.of("Asia/Ho_Chi_Minh")
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
@@ -93,6 +99,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        queueSyncIfStale()
         if (::notificationChip.isInitialized) updateNotificationChip()
         if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
     }
@@ -172,6 +179,8 @@ class MainActivity : Activity() {
 
         addSpacer(tabContent, 12)
         tabContent.addView(sectionHeader())
+        addSpacer(tabContent, 8)
+        tabContent.addView(filterPanel())
 
         eventsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -601,6 +610,23 @@ class MainActivity : Activity() {
 
         addSpacer(panel, 10)
         panel.addView(TextView(this).apply {
+            text = "Mốc nhắc trước hạn"
+            textSize = 12f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        panel.addView(TextView(this).apply {
+            text = "Mặc định bật 1 ngày, 12 giờ và 1 giờ. Có thể thêm/bớt mốc, nhưng app luôn giữ ít nhất 1 mốc nhắc."
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(4), 0, dp(6))
+        })
+        panel.addView(reminderOffsetsRow(listOf(2L * 24L * 60L, 24L * 60L, 12L * 60L)))
+        addSpacer(panel, 6)
+        panel.addView(reminderOffsetsRow(listOf(3L * 60L, 60L, 30L)))
+
+        addSpacer(panel, 10)
+        panel.addView(TextView(this).apply {
             text = "Kiểm tra hoạt động"
             textSize = 12f
             setTextColor(ink)
@@ -667,7 +693,10 @@ class MainActivity : Activity() {
         } else {
             "Pin: nên tắt tối ưu pin để Android không chặn nhắc deadline"
         }
-        notificationHealthText.text = "$notificationStatus\n$batteryStatus\nNhắc deadline luôn dùng 3 mốc: 1 ngày, 12 giờ, 1 giờ trước hạn."
+        val syncStatus = EventStore.getLastSync(this).takeIf { it > 0L }?.let {
+            "Sync: lần gần nhất ${timeFormatter.format(Instant.ofEpochMilli(it))}"
+        } ?: "Sync: chưa đồng bộ thành công"
+        notificationHealthText.text = "$notificationStatus\n$batteryStatus\n$syncStatus\nMốc nhắc trước hạn: ${EventStore.reminderOffsetsText(this)}."
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
@@ -734,6 +763,41 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun reminderOffsetsRow(minutesOptions: List<Long>): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        minutesOptions.forEachIndexed { index, minutes ->
+            row.addView(reminderOffsetButton(minutes), LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+                if (index > 0) marginStart = dp(6)
+            })
+        }
+        return row
+    }
+
+    private fun reminderOffsetButton(minutes: Long): Button {
+        val selected = EventStore.isReminderOffsetEnabled(this, minutes)
+        return Button(this).apply {
+            text = EventStore.reminderOptionLabel(minutes)
+            textSize = 11f
+            setAllCaps(false)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setTextColor(if (selected) Color.WHITE else blue)
+            background = if (selected) rounded(blue, 8) else rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
+            setOnClickListener {
+                val enabledCount = EventStore.getReminderOffsetsMinutes(this@MainActivity).size
+                if (selected && enabledCount <= 1) {
+                    Toast.makeText(this@MainActivity, "Cần giữ ít nhất 1 mốc nhắc.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                EventStore.setReminderOffsetEnabled(this@MainActivity, minutes, !selected)
+                ReminderScheduler.scheduleAll(this@MainActivity, activeEventsForReminders())
+                showGuideTab()
+            }
+        }
+    }
+
     private fun showDailyTimePicker() {
         TimePickerDialog(
             this,
@@ -781,6 +845,24 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun openEventMoodle(event: DeadlineEvent) {
+        openUrl(event.sourceUrl?.takeIf { it.isNotBlank() } ?: "https://utexlms.hcmute.edu.vn/calendar/view.php?view=month")
+    }
+
+    private fun copyEventInfo(event: DeadlineEvent) {
+        val instant = Instant.ofEpochMilli(event.startAtMillis)
+        val lines = mutableListOf(
+            "${EventLabels.kind(event)}: ${event.title}",
+            "${EventLabels.timeLabel(event)}: ${timeFormatter.format(instant)}"
+        )
+        EventLabels.course(event)?.let { lines += "Môn/Lớp: $it" }
+        EventLabels.cleanDescription(event)?.let { lines += it }
+        event.sourceUrl?.takeIf { it.isNotBlank() }?.let { lines += "Link Moodle: $it" }
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("UTE Notice deadline", lines.joinToString("\n")))
+        Toast.makeText(this, "Đã copy thông tin deadline.", Toast.LENGTH_SHORT).show()
+    }
+
     private fun sectionHeader(): View {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -800,7 +882,7 @@ class MainActivity : Activity() {
         titleRow.addView(eventCountText)
         header.addView(titleRow)
         header.addView(TextView(this).apply {
-            text = "Loại lịch, môn/lớp và thời hạn được tách riêng. App luôn nhắc 1 ngày, 12 giờ và 1 giờ trước hạn."
+            text = "Loại lịch, môn/lớp và thời hạn được tách riêng. Mốc nhắc đang bật: ${EventStore.reminderOffsetsText(this@MainActivity)} trước hạn."
             textSize = 12f
             setTextColor(muted)
             setPadding(0, dp(4), 0, dp(8))
@@ -828,6 +910,91 @@ class MainActivity : Activity() {
             background = if (selected) rounded(blue, 8) else rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
             setOnClickListener {
                 eventViewMode = mode
+                showCalendarTab()
+            }
+        }
+    }
+
+    private fun filterPanel(): View {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = rounded(card, 8, line, 1)
+        }
+
+        val search = EditText(this).apply {
+            hint = "Tìm theo tên bài, môn/lớp, loại deadline"
+            setSingleLine(true)
+            textSize = 13f
+            setTextColor(ink)
+            setHintTextColor(Color.rgb(148, 163, 184))
+            setPadding(dp(12), 0, dp(12), 0)
+            inputType = InputType.TYPE_CLASS_TEXT
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+            setText(eventSearchText)
+            setSelection(text.length)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    eventSearchText = s?.toString().orEmpty()
+                    if (::eventsContainer.isInitialized) refreshEventsList()
+                }
+            })
+        }
+        panel.addView(search, LinearLayout.LayoutParams(match(), dp(42)))
+
+        addSpacer(panel, 8)
+        val kindRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val filters = listOf(
+            EventFilter.ALL,
+            EventFilter.SUBMISSION,
+            EventFilter.TEST,
+            EventFilter.EXAM
+        )
+        filters.forEachIndexed { index, filter ->
+            kindRow.addView(filterButton(filter), LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+                if (index > 0) marginStart = dp(6)
+            })
+        }
+        panel.addView(kindRow)
+
+        addSpacer(panel, 8)
+        val doneRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        doneRow.addView(TextView(this).apply {
+            text = if (hideDoneEvents) "Đang ẩn deadline đã xong" else "Đang hiển thị cả deadline đã xong"
+            textSize = 12f
+            setTextColor(muted)
+        }, LinearLayout.LayoutParams(0, wrap(), 1f))
+        doneRow.addView(secondaryButton(if (hideDoneEvents) "Hiện đã xong" else "Ẩn đã xong").apply {
+            setOnClickListener {
+                hideDoneEvents = !hideDoneEvents
+                refreshEventsList()
+                showCalendarTab()
+            }
+        }, LinearLayout.LayoutParams(dp(126), dp(38)))
+        panel.addView(doneRow)
+        return panel
+    }
+
+    private fun filterButton(filter: EventFilter): Button {
+        val selected = selectedFilter == filter
+        return Button(this).apply {
+            text = filter.label
+            textSize = 11f
+            setAllCaps(false)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setTextColor(if (selected) Color.WHITE else blue)
+            background = if (selected) rounded(blue, 8) else rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
+            setOnClickListener {
+                selectedFilter = filter
+                refreshEventsList()
                 showCalendarTab()
             }
         }
@@ -876,12 +1043,47 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun queueSyncIfStale() {
+        if (EventStore.getIcalUrl(this).isBlank()) return
+        val lastSync = EventStore.getLastSync(this)
+        val staleMillis = 30L * 60L * 1000L
+        if (lastSync == 0L || System.currentTimeMillis() - lastSync > staleMillis) {
+            ReminderScheduler.scheduleImmediateSync(this)
+        }
+    }
+
+    private fun toggleDone(event: DeadlineEvent) {
+        val nextDone = !EventStore.isDone(this, event.id)
+        EventStore.setDone(this, event.id, nextDone)
+        ReminderScheduler.scheduleAll(this, activeEventsForReminders())
+        Toast.makeText(
+            this,
+            if (nextDone) "Đã đánh dấu xong." else "Đã bỏ đánh dấu xong.",
+            Toast.LENGTH_SHORT
+        ).show()
+        refreshEventsList()
+    }
+
+    private fun activeEventsForReminders(): List<DeadlineEvent> {
+        return EventStore.loadEvents(this).filterNot { EventStore.isDone(this, it.id) }
+    }
+
     private fun refreshEventsList() {
         eventsContainer.removeAllViews()
-        val events = EventStore.loadEvents(this)
-        eventCountText.text = "${events.size} mục"
-        if (events.isEmpty()) {
+        val allEvents = EventStore.loadEvents(this)
+        val events = filterEvents(allEvents)
+        eventCountText.text = if (events.size == allEvents.size) {
+            "${allEvents.size} mục"
+        } else {
+            "${events.size}/${allEvents.size} mục"
+        }
+        if (allEvents.isEmpty()) {
             eventsContainer.addView(emptyStateView())
+            updateLastSyncStatus()
+            return
+        }
+        if (events.isEmpty()) {
+            eventsContainer.addView(filteredEmptyStateView())
             updateLastSyncStatus()
             return
         }
@@ -892,6 +1094,24 @@ class MainActivity : Activity() {
             renderListView(events)
         }
         updateLastSyncStatus()
+    }
+
+    private fun filterEvents(events: List<DeadlineEvent>): List<DeadlineEvent> {
+        val query = searchable(eventSearchText.trim())
+        val doneIds = EventStore.getDoneIds(this)
+        return events.filter { event ->
+            val doneOk = !hideDoneEvents || event.id !in doneIds
+            val kindOk = when (selectedFilter) {
+                EventFilter.ALL -> true
+                EventFilter.SUBMISSION -> EventLabels.broadKind(event) == "Bài nộp"
+                EventFilter.TEST -> EventLabels.broadKind(event) == "Kiểm tra"
+                EventFilter.EXAM -> EventLabels.broadKind(event) == "Thi"
+            }
+            val searchOk = query.isBlank() || searchable(
+                "${event.title} ${event.rawType.orEmpty()} ${event.description.orEmpty()} ${EventLabels.kind(event)}"
+            ).contains(query)
+            doneOk && kindOk && searchOk
+        }
     }
 
     private fun renderListView(events: List<DeadlineEvent>) {
@@ -1093,10 +1313,11 @@ class MainActivity : Activity() {
 
     private fun eventView(event: DeadlineEvent): View {
         val accent = accentFor(event)
+        val isDone = EventStore.isDone(this, event.id)
         val cardView = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(10), dp(10), dp(12), dp(10))
-            background = rounded(card, 8, line, 1)
+            background = rounded(if (isDone) Color.rgb(248, 250, 252) else card, 8, line, 1)
             gravity = Gravity.CENTER_VERTICAL
         }
 
@@ -1139,6 +1360,11 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         meta.addView(chip(eventKind(event), accent, tint(accent)))
+        if (isDone) {
+            meta.addView(chip("Đã xong", green, Color.rgb(229, 248, 239)), LinearLayout.LayoutParams(wrap(), wrap()).apply {
+                marginStart = dp(6)
+            })
+        }
         EventLabels.course(event)?.let { course ->
             meta.addView(chip(course, blueDark, Color.rgb(248, 250, 252)), LinearLayout.LayoutParams(wrap(), wrap()).apply {
                 marginStart = dp(6)
@@ -1149,7 +1375,7 @@ class MainActivity : Activity() {
         info.addView(TextView(this).apply {
             text = event.title
             textSize = 15f
-            setTextColor(ink)
+            setTextColor(if (isDone) muted else ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             setPadding(0, dp(7), 0, 0)
             maxLines = 2
@@ -1174,10 +1400,29 @@ class MainActivity : Activity() {
         info.addView(TextView(this).apply {
             text = remainText(event.startAtMillis)
             textSize = 13f
-            setTextColor(accent)
+            setTextColor(if (isDone) muted else accent)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             setPadding(0, dp(4), 0, 0)
         })
+        val actionRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, 0)
+        }
+        actionRow.addView(secondaryButton("Mở").apply {
+            setOnClickListener { openEventMoodle(event) }
+        }, LinearLayout.LayoutParams(0, dp(38), 1f))
+        actionRow.addView(secondaryButton("Copy").apply {
+            setOnClickListener { copyEventInfo(event) }
+        }, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+            marginStart = dp(6)
+        })
+        actionRow.addView((if (isDone) outlineButton("Bỏ xong") else primaryButton("Xong")).apply {
+            setOnClickListener { toggleDone(event) }
+        }, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+            marginStart = dp(6)
+        })
+        info.addView(actionRow)
         return cardView
     }
 
@@ -1197,6 +1442,28 @@ class MainActivity : Activity() {
             })
             addView(TextView(this@MainActivity).apply {
                 text = "Dán iCal URL rồi bấm Đồng bộ để tải lịch."
+                textSize = 13f
+                setTextColor(muted)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(5), 0, 0)
+            })
+        }
+    }
+
+    private fun filteredEmptyStateView(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = rounded(card, 8, line, 1)
+            addView(TextView(this@MainActivity).apply {
+                text = "Không có mục phù hợp"
+                textSize = 16f
+                setTextColor(ink)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "Thử đổi từ khóa, bộ lọc hoặc bật hiển thị deadline đã xong."
                 textSize = 13f
                 setTextColor(muted)
                 gravity = Gravity.CENTER
@@ -1299,6 +1566,12 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun searchable(text: String): String {
+        return Normalizer.normalize(text.lowercase(Locale.forLanguageTag("vi-VN")), Normalizer.Form.NFD)
+            .replace("\\p{M}+".toRegex(), "")
+            .replace('đ', 'd')
+    }
+
     private fun chip(text: String, textColor: Int, backgroundColor: Int): TextView {
         return TextView(this).apply {
             this.text = text
@@ -1365,6 +1638,13 @@ class MainActivity : Activity() {
     private enum class EventViewMode {
         LIST,
         MONTH
+    }
+
+    private enum class EventFilter(val label: String) {
+        ALL("Tất cả"),
+        SUBMISSION("Bài nộp"),
+        TEST("Kiểm tra"),
+        EXAM("Thi")
     }
 
     private data class DayOption(

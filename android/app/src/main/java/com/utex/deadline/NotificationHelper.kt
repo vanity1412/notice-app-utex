@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -40,8 +41,9 @@ object NotificationHelper {
         show(
             context = context,
             title = "Lịch mới: ${EventLabels.kind(event)}",
-            message = eventMessage(event),
-            id = stableNotificationId("new-${event.id}")
+            message = eventMessage(context, event),
+            id = stableNotificationId("new-${event.id}"),
+            targetUrl = event.sourceUrl
         )
     }
 
@@ -49,8 +51,9 @@ object NotificationHelper {
         show(
             context = context,
             title = "Cảnh báo: $leadText",
-            message = eventMessage(event),
-            id = stableNotificationId("reminder-${event.id}-$leadText")
+            message = eventMessage(context, event),
+            id = stableNotificationId("reminder-${event.id}-$leadText"),
+            targetUrl = event.sourceUrl
         )
     }
 
@@ -67,13 +70,14 @@ object NotificationHelper {
         show(
             context = context,
             title = "Test thông báo UTE Notice",
-            message = "Nếu bạn thấy thông báo này thì quyền thông báo đang hoạt động.\nApp sẽ nhắc deadline ở 3 mốc: 1 ngày, 12 giờ và 1 giờ trước hạn.",
+            message = "Nếu bạn thấy thông báo này thì quyền thông báo đang hoạt động.\nMốc nhắc đang bật: ${EventStore.reminderOffsetsText(context)} trước hạn.",
             id = stableNotificationId("test-notification")
         )
     }
 
     fun notifyDailySummary(context: Context, events: List<DeadlineEvent>) {
         val upcoming = events
+            .filterNot { EventStore.isDone(context, it.id) }
             .filter { it.startAtMillis >= System.currentTimeMillis() - 60_000L }
             .sortedBy { it.startAtMillis }
             .take(3)
@@ -94,25 +98,28 @@ object NotificationHelper {
         show(
             context = context,
             title = "Nhắc lịch hôm nay",
-            message = "Có ${events.size} mục đang theo dõi.\n$lines",
+            message = "Có ${events.count { !EventStore.isDone(context, it.id) }} mục đang theo dõi.\n$lines",
             id = stableNotificationId("daily-summary")
         )
     }
 
-    private fun show(context: Context, title: String, message: String, id: Int) {
+    private fun show(context: Context, title: String, message: String, id: Int, targetUrl: String? = null) {
         ensureChannel(context)
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return
         }
-        val intent = Intent(context, MainActivity::class.java)
+        val intent = targetUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let { Intent(Intent.ACTION_VIEW, Uri.parse(it)) }
+            ?: Intent(context, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            id,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_stat_ute_notice)
             .setContentTitle(title)
             .setContentText(message.lineSequence().firstOrNull().orEmpty())
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
@@ -125,13 +132,13 @@ object NotificationHelper {
 
     fun formatTime(millis: Long): String = timeFormatter.format(Instant.ofEpochMilli(millis))
 
-    private fun eventMessage(event: DeadlineEvent): String {
+    private fun eventMessage(context: Context, event: DeadlineEvent): String {
         val lines = mutableListOf<String>()
         lines += "${EventLabels.kind(event)}: ${event.title}"
         EventLabels.course(event)?.let { lines += "Môn/Lớp: $it" }
         EventLabels.cleanDescription(event)?.let { lines += it }
         lines += "${EventLabels.timeLabel(event)}: ${formatTime(event.startAtMillis)}"
-        lines += "Mốc nhắc cố định: 1 ngày, 12 giờ, 1 giờ trước hạn."
+        lines += "Mốc nhắc đang bật: ${EventStore.reminderOffsetsText(context)} trước hạn."
         return lines.joinToString("\n")
     }
 

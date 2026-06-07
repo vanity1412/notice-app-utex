@@ -19,7 +19,11 @@ object EventStore {
     private const val KEY_DAILY_SUMMARY_HOUR = "daily_summary_hour"
     private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute"
     private const val KEY_DAILY_SUMMARY_DAYS = "daily_summary_days"
+    private const val KEY_DONE_IDS = "done_ids"
+    private const val KEY_REMINDER_OFFSETS = "reminder_offsets"
     const val ALL_DAYS_MASK = 0b1111111
+    private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L)
+    private val ALLOWED_REMINDER_MINUTES = listOf(2L * 24L * 60L, 24L * 60L, 12L * 60L, 3L * 60L, 60L, 30L)
 
     fun getIcalUrl(context: Context): String {
         return prefs(context).getString(KEY_ICAL_URL, "").orEmpty()
@@ -36,6 +40,7 @@ object EventStore {
             .remove(KEY_KNOWN_IDS)
             .remove(KEY_LAST_SYNC)
             .remove(KEY_DAILY_SUMMARY_TOUCHED)
+            .remove(KEY_DONE_IDS)
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
             .apply()
         clearLegacyConnection(context)
@@ -142,6 +147,7 @@ object EventStore {
             })
         }
         prefs(context).edit().putString(KEY_EVENTS, arr.toString()).apply()
+        clearDoneForMissingEvents(context, events.map { it.id }.toSet())
     }
 
     fun getKnownIds(context: Context): MutableSet<String> {
@@ -154,6 +160,79 @@ object EventStore {
 
     fun resetKnownIds(context: Context) {
         prefs(context).edit().remove(KEY_KNOWN_IDS).apply()
+    }
+
+    fun getDoneIds(context: Context): Set<String> {
+        return prefs(context).getStringSet(KEY_DONE_IDS, emptySet())?.toSet() ?: emptySet()
+    }
+
+    fun isDone(context: Context, eventId: String): Boolean {
+        return eventId in getDoneIds(context)
+    }
+
+    fun setDone(context: Context, eventId: String, done: Boolean) {
+        val ids = getDoneIds(context).toMutableSet()
+        if (done) {
+            ids += eventId
+        } else {
+            ids -= eventId
+        }
+        prefs(context).edit().putStringSet(KEY_DONE_IDS, ids).apply()
+    }
+
+    fun getReminderOffsetOptions(): List<Long> = ALLOWED_REMINDER_MINUTES
+
+    fun getReminderOffsetsMinutes(context: Context): List<Long> {
+        val saved = prefs(context).getString(KEY_REMINDER_OFFSETS, null)
+        val parsed = saved
+            ?.split(',')
+            ?.mapNotNull { it.trim().toLongOrNull() }
+            ?.filter { it in ALLOWED_REMINDER_MINUTES }
+            ?.distinct()
+            .orEmpty()
+        val selected = parsed.ifEmpty { DEFAULT_REMINDER_MINUTES }
+        return ALLOWED_REMINDER_MINUTES.filter { it in selected }
+    }
+
+    fun isReminderOffsetEnabled(context: Context, minutes: Long): Boolean {
+        return minutes in getReminderOffsetsMinutes(context)
+    }
+
+    fun setReminderOffsetEnabled(context: Context, minutes: Long, enabled: Boolean) {
+        if (minutes !in ALLOWED_REMINDER_MINUTES) return
+        val selected = getReminderOffsetsMinutes(context).toMutableSet()
+        if (enabled) {
+            selected += minutes
+        } else {
+            selected -= minutes
+        }
+        val safeSelected = selected.ifEmpty { setOf(60L) }
+        val saved = ALLOWED_REMINDER_MINUTES
+            .filter { it in safeSelected }
+            .joinToString(",")
+        prefs(context).edit().putString(KEY_REMINDER_OFFSETS, saved).apply()
+    }
+
+    fun reminderOptionLabel(minutes: Long): String {
+        return when (minutes) {
+            2L * 24L * 60L -> "2 ngày"
+            24L * 60L -> "1 ngày"
+            12L * 60L -> "12 giờ"
+            3L * 60L -> "3 giờ"
+            60L -> "1 giờ"
+            30L -> "30 phút"
+            else -> "$minutes phút"
+        }
+    }
+
+    fun reminderLeadLabel(minutes: Long): String {
+        return "${reminderOptionLabel(minutes)} trước hạn"
+    }
+
+    fun reminderOffsetsText(context: Context): String {
+        return getReminderOffsetsMinutes(context)
+            .joinToString(", ") { reminderOptionLabel(it) }
+            .ifBlank { "1 giờ" }
     }
 
     private fun prefs(context: Context): SharedPreferences {
@@ -196,7 +275,8 @@ object EventStore {
             KEY_DAILY_SUMMARY_TOUCHED,
             KEY_DAILY_SUMMARY_HOUR,
             KEY_DAILY_SUMMARY_MINUTE,
-            KEY_DAILY_SUMMARY_DAYS
+            KEY_DAILY_SUMMARY_DAYS,
+            KEY_REMINDER_OFFSETS
         ).forEach { key ->
             when (val value = legacyPrefs.all[key]) {
                 is String -> editor.putString(key, value)
@@ -208,8 +288,19 @@ object EventStore {
         legacyPrefs.getStringSet(KEY_KNOWN_IDS, null)?.let {
             editor.putStringSet(KEY_KNOWN_IDS, it)
         }
+        legacyPrefs.getStringSet(KEY_DONE_IDS, null)?.let {
+            editor.putStringSet(KEY_DONE_IDS, it)
+        }
         editor.apply()
         clearLegacyConnection(context)
+    }
+
+    private fun clearDoneForMissingEvents(context: Context, eventIds: Set<String>) {
+        val doneIds = getDoneIds(context)
+        val keptIds = doneIds.intersect(eventIds)
+        if (keptIds.size != doneIds.size) {
+            prefs(context).edit().putStringSet(KEY_DONE_IDS, keptIds).apply()
+        }
     }
 
     private fun clearLegacyConnection(context: Context) {
@@ -218,6 +309,7 @@ object EventStore {
             .remove(KEY_EVENTS)
             .remove(KEY_KNOWN_IDS)
             .remove(KEY_LAST_SYNC)
+            .remove(KEY_DONE_IDS)
             .apply()
     }
 }

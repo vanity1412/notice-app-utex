@@ -17,9 +17,11 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 - Có nút dán nhanh từ clipboard, xóa kết nối Moodle và che `authtoken` sau khi lưu.
 - Tự đồng bộ lịch nền khoảng 15 phút/lần khi có mạng.
 - Hiển thị deadline sắp tới dạng thẻ dễ nhìn, có thể đổi sang chế độ lịch tháng.
+- Có ô tìm kiếm, lọc theo bài nộp/kiểm tra/thi và ẩn/hiện deadline đã đánh dấu xong.
 - Phân loại nhanh: bài nộp, kiểm tra, thi, deadline.
+- Mỗi deadline có nút mở Moodle, copy thông tin và đánh dấu đã xong.
 - Thông báo khi phát hiện deadline mới.
-- Nhắc trước hạn cố định: 1 ngày, 12 giờ, 1 giờ.
+- Nhắc trước hạn mặc định: 1 ngày, 12 giờ, 1 giờ; có thể bật thêm 2 ngày, 3 giờ, 30 phút hoặc bỏ bớt mốc.
 - Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 6:00.
 - Thông báo tổng hợp chỉ tự bật sau khi đã kết nối và sync Moodle thành công.
 - Có thể chọn giờ/phút và ngày trong tuần để nhận thông báo tổng hợp.
@@ -76,6 +78,8 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 4. Dán Calendar URL đã copy từ Moodle, hoặc bấm **Dán clipboard**.
 5. Bấm **Lưu & đồng bộ**.
 6. App sẽ hiển thị lịch sắp tới và tự nhắc khi có deadline mới hoặc gần tới hạn.
+7. Dùng ô tìm kiếm hoặc bộ lọc để xem nhanh bài nộp/kiểm tra/thi.
+8. Bấm **Xong** trên deadline đã hoàn thành để ẩn khỏi danh sách và không nhắc lại mục đó.
 
 ## Cài Đặt Thông Báo
 
@@ -85,7 +89,8 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 - Bấm **Chọn giờ** để đặt giờ/phút cụ thể.
 - Bấm các nút **T2, T3, T4, T5, T6, T7, CN** để chọn ngày nhận thông báo.
 - Bấm **Mỗi ngày** để bật đủ cả tuần, hoặc **Tắt** để tắt thông báo tổng hợp.
-- Các nhắc trước hạn riêng lẻ luôn được giữ: 1 ngày, 12 giờ và 1 giờ trước deadline.
+- Các nhắc trước hạn riêng lẻ mặc định bật: 1 ngày, 12 giờ và 1 giờ trước deadline.
+- Có thể bật/tắt từng mốc nhắc trước hạn trong app; app luôn giữ ít nhất 1 mốc nhắc.
 - Bấm **Gửi test** để kiểm tra điện thoại có nhận thông báo không.
 - Bấm **Cài đặt pin** và cho phép app chạy nền nếu máy hay tự tắt ứng dụng.
 - Nếu không nhận được thông báo, kiểm tra quyền thông báo của Android cho app **UTE Notice**.
@@ -104,8 +109,9 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 2. Vào tab **Actions**.
 3. Chọn workflow **Build Android APK**.
 4. Bấm **Run workflow**.
-5. Khi chạy xong, tải artifact `UTE-Notice-apk`.
-6. Giải nén artifact để lấy `UTE-Notice.apk`.
+5. Workflow sẽ chạy unit test parser iCal trước khi build APK.
+6. Khi chạy xong, tải artifact `UTE-Notice-apk`.
+7. Giải nén artifact để lấy `UTE-Notice.apk`.
 
 ## Mở Code Bằng Android Studio
 
@@ -128,4 +134,5 @@ android/app/src/main/java/com/utex/deadline/DeadlineSync.kt       # Tải lịch
 android/app/src/main/java/com/utex/deadline/SyncWorker.kt         # Tự sync nền
 android/app/src/main/java/com/utex/deadline/ReminderWorker.kt     # Nhắc trước hạn
 android/app/src/main/java/com/utex/deadline/ReminderScheduler.kt  # Lên lịch sync và nhắc
+android/app/src/test/java/com/utex/deadline/IcsParserTest.kt      # Test parse file iCal Moodle
 ```
