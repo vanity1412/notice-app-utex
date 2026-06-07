@@ -1,9 +1,11 @@
 package com.utex.deadline
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -18,7 +20,11 @@ object ReminderScheduler {
     )
 
     fun schedulePeriodicSync(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
         val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(constraints)
             .addTag("ute-deadline-sync")
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -29,7 +35,13 @@ object ReminderScheduler {
     }
 
     fun scheduleImmediateSync(context: Context) {
-        val request = OneTimeWorkRequestBuilder<SyncWorker>().build()
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .addTag("ute-deadline-sync")
+            .build()
         WorkManager.getInstance(context).enqueue(request)
     }
 
@@ -52,7 +64,7 @@ object ReminderScheduler {
                         .build()
                     manager.enqueueUniqueWork(
                         "reminder-${event.id}-$offsetMinutes",
-                        ExistingWorkPolicy.KEEP,
+                        ExistingWorkPolicy.REPLACE,
                         request
                     )
                 }

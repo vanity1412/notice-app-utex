@@ -26,10 +26,10 @@ object NotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Thông báo deadline",
+                "UTE Notice",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Báo deadline mới và nhắc deadline UTEx"
+                description = "Báo lịch kiểm tra và deadline Moodle HCM-UTE"
             }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -39,7 +39,7 @@ object NotificationHelper {
     fun notifyNewDeadline(context: Context, event: DeadlineEvent) {
         show(
             context = context,
-            title = "Có deadline mới",
+            title = "Deadline mới",
             message = "${event.title}\nHạn: ${formatTime(event.startAtMillis)}",
             id = stableNotificationId("new-${event.id}")
         )
@@ -57,8 +57,8 @@ object NotificationHelper {
     fun notifySummary(context: Context, count: Int) {
         show(
             context = context,
-            title = "UTE Deadline đã sẵn sàng",
-            message = "Đã tìm thấy $count deadline sắp tới. Từ giờ có deadline mới app sẽ báo.",
+            title = "UTE Notice đã sẵn sàng",
+            message = "Đã tìm thấy $count deadline sắp tới. App sẽ nhắc khi có lịch mới hoặc gần tới hạn.",
             id = stableNotificationId("summary-first-sync")
         )
     }
