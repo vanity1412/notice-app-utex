@@ -43,6 +43,11 @@ class MainActivity : Activity() {
     private lateinit var eventCountText: TextView
     private lateinit var notificationChip: TextView
     private lateinit var dailySummaryText: TextView
+    private lateinit var tabContent: LinearLayout
+    private lateinit var calendarTab: TextView
+    private lateinit var guideTab: TextView
+    private var activeTab = ScreenTab.CALENDAR
+    private var connectionExpanded = false
 
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
         .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
@@ -72,7 +77,6 @@ class MainActivity : Activity() {
         buildUi()
         ReminderScheduler.schedulePeriodicSync(this)
         ReminderScheduler.scheduleDailySummary(this)
-        refreshEventsList()
     }
 
     override fun onResume() {
@@ -94,12 +98,56 @@ class MainActivity : Activity() {
         }
         root.addView(body, LinearLayout.LayoutParams(match(), 0, 1f))
 
-        body.addView(connectionPanel())
-        addSpacer(body, 10)
-        body.addView(quickGuidePanel())
-        addSpacer(body, 10)
-        body.addView(notificationSettingsPanel())
-        addSpacer(body, 10)
+        body.addView(tabBar())
+        addSpacer(body, 12)
+
+        tabContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        body.addView(tabContent, LinearLayout.LayoutParams(match(), 0, 1f))
+
+        setContentView(root)
+        showCalendarTab()
+        updateNotificationChip()
+    }
+
+    private fun tabBar(): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(Color.rgb(232, 239, 248), 8)
+            setPadding(dp(3), dp(3), dp(3), dp(3))
+        }
+        calendarTab = tabButton("Lịch sắp tới").apply {
+            setOnClickListener { showCalendarTab() }
+        }
+        guideTab = tabButton("Hướng dẫn").apply {
+            setOnClickListener { showGuideTab() }
+        }
+        row.addView(calendarTab, LinearLayout.LayoutParams(0, dp(42), 1f))
+        row.addView(guideTab, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+            marginStart = dp(4)
+        })
+        return row
+    }
+
+    private fun tabButton(text: String): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setPadding(dp(10), 0, dp(10), 0)
+        }
+    }
+
+    private fun showCalendarTab() {
+        activeTab = ScreenTab.CALENDAR
+        updateTabButtons()
+        tabContent.removeAllViews()
+
+        tabContent.addView(connectionPanel())
+        addSpacer(tabContent, 10)
 
         statusText = TextView(this).apply {
             textSize = 13f
@@ -107,10 +155,10 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = rounded(Color.rgb(231, 242, 255), 8, Color.rgb(190, 218, 248), 1)
         }
-        body.addView(statusText, LinearLayout.LayoutParams(match(), wrap()))
+        tabContent.addView(statusText, LinearLayout.LayoutParams(match(), wrap()))
 
-        addSpacer(body, 12)
-        body.addView(sectionHeader())
+        addSpacer(tabContent, 12)
+        tabContent.addView(sectionHeader())
 
         eventsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -121,13 +169,43 @@ class MainActivity : Activity() {
             clipToPadding = false
             addView(eventsContainer)
         }
-        body.addView(scroll, LinearLayout.LayoutParams(match(), 0, 1f))
+        tabContent.addView(scroll, LinearLayout.LayoutParams(match(), 0, 1f))
 
-        setContentView(root)
-        setStatus("Dán iCal URL rồi bấm Đồng bộ.", StatusType.INFO)
+        setStatus(calendarDefaultStatus(), StatusType.INFO)
         updateLastSyncStatus()
-        updateNotificationChip()
+        refreshEventsList()
+    }
+
+    private fun showGuideTab() {
+        activeTab = ScreenTab.GUIDE
+        updateTabButtons()
+        tabContent.removeAllViews()
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(16))
+        }
+        content.addView(quickGuidePanel())
+        addSpacer(content, 10)
+        content.addView(notificationSettingsPanel())
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            addView(content)
+        }
+        tabContent.addView(scroll, LinearLayout.LayoutParams(match(), match()))
         refreshDailySummaryText()
+    }
+
+    private fun updateTabButtons() {
+        if (!::calendarTab.isInitialized || !::guideTab.isInitialized) return
+        val selectedBackground = rounded(card, 8, line, 1)
+        val idleBackground = rounded(Color.TRANSPARENT, 8)
+        calendarTab.background = if (activeTab == ScreenTab.CALENDAR) selectedBackground else idleBackground
+        guideTab.background = if (activeTab == ScreenTab.GUIDE) selectedBackground else idleBackground
+        calendarTab.setTextColor(if (activeTab == ScreenTab.CALENDAR) blueDark else muted)
+        guideTab.setTextColor(if (activeTab == ScreenTab.GUIDE) blueDark else muted)
     }
 
     private fun headerView(): View {
@@ -165,17 +243,36 @@ class MainActivity : Activity() {
     }
 
     private fun connectionPanel(): View {
+        val savedUrl = EventStore.getIcalUrl(this)
+        val hasUrl = savedUrl.isNotBlank()
+        if (hasUrl && !connectionExpanded) {
+            return compactConnectionRow()
+        }
+
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(14))
             background = rounded(card, 8, line, 1)
         }
-        panel.addView(TextView(this).apply {
-            text = "Kết nối lịch Moodle"
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        titleRow.addView(TextView(this).apply {
+            text = if (hasUrl) "Chỉnh kết nối Moodle" else "Kết nối Moodle"
             textSize = 16f
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        })
+        }, LinearLayout.LayoutParams(0, wrap(), 1f))
+        if (hasUrl) {
+            titleRow.addView(chip("Thu gọn", blue, Color.rgb(226, 238, 252)).apply {
+                setOnClickListener {
+                    connectionExpanded = false
+                    showCalendarTab()
+                }
+            })
+        }
+        panel.addView(titleRow)
         addSpacer(panel, 8)
 
         urlInput = EditText(this).apply {
@@ -189,7 +286,7 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
-            setText(EventStore.getIcalUrl(this@MainActivity))
+            setText(savedUrl)
         }
         panel.addView(urlInput, LinearLayout.LayoutParams(match(), wrap()))
 
@@ -203,6 +300,8 @@ class MainActivity : Activity() {
             setOnClickListener {
                 EventStore.setIcalUrl(this@MainActivity, urlInput.text.toString())
                 ReminderScheduler.schedulePeriodicSync(this@MainActivity)
+                connectionExpanded = false
+                showCalendarTab()
                 syncNow()
             }
         }
@@ -219,18 +318,35 @@ class MainActivity : Activity() {
         }
         buttons.addView(syncButton, syncLp)
         panel.addView(buttons)
-
-        val resetButton = outlineButton("Test lại thông báo deadline mới").apply {
-            setOnClickListener {
-                EventStore.resetKnownIds(this@MainActivity)
-                setStatus("Đã reset danh sách đã biết. Bấm Kiểm tra để test thông báo mới.", StatusType.SUCCESS)
-            }
-        }
-        val resetLp = LinearLayout.LayoutParams(match(), dp(44)).apply {
-            topMargin = dp(8)
-        }
-        panel.addView(resetButton, resetLp)
         return panel
+    }
+
+    private fun compactConnectionRow(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(card, 8, line, 1)
+            setOnClickListener {
+                connectionExpanded = true
+                showCalendarTab()
+            }
+
+            addView(TextView(this@MainActivity).apply {
+                text = "Kết nối Moodle"
+                textSize = 15f
+                setTextColor(ink)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }, LinearLayout.LayoutParams(0, wrap(), 1f))
+
+            addView(TextView(this@MainActivity).apply {
+                text = "Đã kết nối - chạm để chỉnh"
+                textSize = 12f
+                setTextColor(green)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+                gravity = Gravity.END
+            })
+        }
     }
 
     private fun quickGuidePanel(): View {
@@ -320,6 +436,16 @@ class MainActivity : Activity() {
             marginStart = dp(6)
         })
         panel.addView(row)
+
+        val resetButton = outlineButton("Test lại thông báo deadline mới").apply {
+            setOnClickListener {
+                EventStore.resetKnownIds(this@MainActivity)
+                setStatus("Đã reset danh sách đã biết. Qua tab Lịch bấm Kiểm tra để test thông báo mới.", StatusType.SUCCESS)
+            }
+        }
+        panel.addView(resetButton, LinearLayout.LayoutParams(match(), dp(42)).apply {
+            topMargin = dp(8)
+        })
         return panel
     }
 
@@ -542,8 +668,17 @@ class MainActivity : Activity() {
 
     private fun updateLastSyncStatus() {
         val lastSync = EventStore.getLastSync(this)
-        if (lastSync > 0L && statusText.text.toString().startsWith("Dán")) {
+        val currentStatus = statusText.text.toString()
+        if (lastSync > 0L && (currentStatus.startsWith("Dán") || currentStatus.startsWith("Moodle"))) {
             setStatus("Cập nhật gần nhất: ${timeFormatter.format(Instant.ofEpochMilli(lastSync))}", StatusType.INFO)
+        }
+    }
+
+    private fun calendarDefaultStatus(): String {
+        return if (EventStore.getIcalUrl(this).isBlank()) {
+            "Dán iCal URL để bắt đầu theo dõi lịch Moodle."
+        } else {
+            "Moodle đã kết nối. App sẽ tự đồng bộ và nhắc lịch."
         }
     }
 
@@ -655,6 +790,11 @@ class MainActivity : Activity() {
         INFO,
         SUCCESS,
         ERROR
+    }
+
+    private enum class ScreenTab {
+        CALENDAR,
+        GUIDE
     }
 
     private class HcmuteMarkView(context: Context) : View(context) {
