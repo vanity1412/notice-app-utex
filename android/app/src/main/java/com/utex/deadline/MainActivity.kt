@@ -3,6 +3,8 @@ package com.utex.deadline
 import android.Manifest
 import android.app.Activity
 import android.app.TimePickerDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,6 +27,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.Instant
@@ -388,12 +391,46 @@ class MainActivity : Activity() {
 
         addSpacer(panel, 8)
         panel.addView(TextView(this).apply {
+            text = "Mở web trường để có quyền truy cập, sau đó copy link Calendar URL:"
+            textSize = 12f
+            setTextColor(muted)
+        })
+        addSpacer(panel, 6)
+        panel.addView(exportUrlRow())
+
+        addSpacer(panel, 8)
+        panel.addView(TextView(this).apply {
             text = "Hỗ trợ: $supportContact"
             textSize = 12f
             setTextColor(blueDark)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         })
         return panel
+    }
+
+    private fun exportUrlRow(): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(8), dp(8), dp(8))
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+        }
+        row.addView(TextView(this).apply {
+            text = moodleExportUrl
+            textSize = 12f
+            setTextColor(blueDark)
+            setSingleLine(false)
+        }, LinearLayout.LayoutParams(0, wrap(), 1f))
+        row.addView(secondaryButton("Copy").apply {
+            setOnClickListener { copyMoodleExportUrl() }
+        }, LinearLayout.LayoutParams(dp(82), dp(38)))
+        return row
+    }
+
+    private fun copyMoodleExportUrl() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Moodle export URL", moodleExportUrl))
+        Toast.makeText(this, "Đã copy link Moodle", Toast.LENGTH_SHORT).show()
     }
 
     private fun notificationSettingsPanel(): View {

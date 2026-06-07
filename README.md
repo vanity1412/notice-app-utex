@@ -18,7 +18,7 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 - Phân loại nhanh: bài nộp, kiểm tra, thi, deadline.
 - Thông báo khi phát hiện deadline mới.
 - Nhắc trước hạn: 7 ngày, 3 ngày, 1 ngày, 2 giờ.
-- Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 7:00.
+- Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 6:00.
 - Có thể chọn giờ/phút và ngày trong tuần để nhận thông báo tổng hợp.
 - Không lưu mật khẩu Moodle.
 - Không dùng `MoodleSession`/cookie trong app.
@@ -49,6 +49,14 @@ Sau đó làm theo các bước:
 
 Trong app cũng có mục **Hướng dẫn nhanh** để mở thẳng trang export lịch Moodle hoặc mở repo GitHub này khi cần xem lại hướng dẫn.
 
+Trong tab **Hướng dẫn**, app hiển thị sẵn link:
+
+```text
+https://utexlms.hcmute.edu.vn/calendar/export.php?
+```
+
+Bạn có thể bấm **Copy** để copy link này. Nếu chưa vào được trang xuất lịch, hãy mở web trường/Moodle trước để có quyền truy cập.
+
 URL đúng thường có dạng:
 
 ```text
@@ -57,7 +65,7 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 
 ## Cách Dùng App
 
-1. Cài file `app-debug.apk` trên điện thoại Android.
+1. Cài file `UTE-Notice.apk` trên điện thoại Android.
 2. Mở app **UTE Notice**.
 3. Cấp quyền thông báo nếu Android hỏi.
 4. Dán Calendar URL đã copy từ Moodle.
@@ -66,7 +74,7 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 
 ## Cài Đặt Thông Báo
 
-- Mặc định app gửi thông báo tổng hợp **mỗi ngày 1 lần lúc 7:00**.
+- Mặc định app gửi thông báo tổng hợp **mỗi ngày 1 lần lúc 6:00**.
 - Trong app, vào tab **Hướng dẫn** -> **Cài đặt thông báo**.
 - Bấm **Chọn giờ** để đặt giờ/phút cụ thể.
 - Bấm các nút **T2, T3, T4, T5, T6, T7, CN** để chọn ngày nhận thông báo.
@@ -88,8 +96,8 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 2. Vào tab **Actions**.
 3. Chọn workflow **Build Android APK**.
 4. Bấm **Run workflow**.
-5. Khi chạy xong, tải artifact `ute-deadline-debug-apk`.
-6. Giải nén artifact để lấy `app-debug.apk`.
+5. Khi chạy xong, tải artifact `UTE-Notice-apk`.
+6. Giải nén artifact để lấy `UTE-Notice.apk`.
 
 ## Mở Code Bằng Android Studio
 

@@ -41,7 +41,7 @@ object EventStore {
     }
 
     fun getDailySummaryHour(context: Context): Int {
-        return prefs(context).getInt(KEY_DAILY_SUMMARY_HOUR, 7)
+        return prefs(context).getInt(KEY_DAILY_SUMMARY_HOUR, 6)
     }
 
     fun getDailySummaryMinute(context: Context): Int {
