@@ -2,6 +2,10 @@
 
 Ứng dụng Android giúp sinh viên HCMUTE theo dõi lịch kiểm tra, deadline bài nộp, quiz/test trên Moodle UTEx LMS và nhận thông báo trước khi tới hạn.
 
+Repo GitHub/hướng dẫn: [vanity1412/notice-app-utex](https://github.com/vanity1412/notice-app-utex)
+
+Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
+
 <p align="center">
   <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/Logo_Tr%C6%B0%E1%BB%9Dng_%C4%90%E1%BA%A1i_H%E1%BB%8Dc_S%C6%B0_Ph%E1%BA%A1m_K%E1%BB%B9_Thu%E1%BA%ADt_TP_H%E1%BB%93_Ch%C3%AD_Minh.png" alt="Logo HCMUTE" width="180">
 </p>
@@ -14,6 +18,8 @@
 - Phân loại nhanh: bài nộp, kiểm tra, thi, deadline.
 - Thông báo khi phát hiện deadline mới.
 - Nhắc trước hạn: 7 ngày, 3 ngày, 1 ngày, 2 giờ.
+- Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 7:00.
+- Có thể đổi giờ thông báo tổng hợp sang 7:00, 12:00, 20:00 hoặc tắt trong app.
 - Không lưu mật khẩu Moodle.
 - Không dùng `MoodleSession`/cookie trong app.
 
@@ -41,6 +47,8 @@ Sau đó làm theo các bước:
 6. Dán URL vừa copy vào ô kết nối lịch Moodle.
 7. Bấm **Lưu & đồng bộ**.
 
+Trong app cũng có mục **Hướng dẫn nhanh** để mở thẳng trang export lịch Moodle hoặc mở repo GitHub này khi cần xem lại hướng dẫn.
+
 URL đúng thường có dạng:
 
 ```text
@@ -55,6 +63,13 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 4. Dán Calendar URL đã copy từ Moodle.
 5. Bấm **Lưu & đồng bộ**.
 6. App sẽ hiển thị lịch sắp tới và tự nhắc khi có deadline mới hoặc gần tới hạn.
+
+## Cài Đặt Thông Báo
+
+- Mặc định app gửi thông báo tổng hợp **mỗi ngày 1 lần lúc 7:00**.
+- Trong app, vào mục **Cài đặt thông báo** để đổi sang **7:00**, **12:00**, **20:00** hoặc **Tắt**.
+- Các nhắc trước hạn riêng lẻ vẫn được giữ: 7 ngày, 3 ngày, 1 ngày và 2 giờ trước deadline.
+- Nếu không nhận được thông báo, kiểm tra quyền thông báo của Android cho app **UTE Notice**.
 
 ## Bảo Mật
 

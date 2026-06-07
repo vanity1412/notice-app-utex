@@ -2,7 +2,6 @@ package com.utex.deadline
 
 import android.Manifest
 import android.app.Activity
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,7 +24,6 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.Instant
@@ -35,13 +33,16 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
-    private val moodleExportUrl = "https://utexlms.hcmute.edu.vn/calendar/export.php"
+    private val moodleExportUrl = "https://utexlms.hcmute.edu.vn/calendar/export.php?"
+    private val githubGuideUrl = "https://github.com/vanity1412/notice-app-utex"
+    private val supportContact = "Vũ Văn Thông - 0968046024"
 
     private lateinit var urlInput: EditText
     private lateinit var statusText: TextView
     private lateinit var eventsContainer: LinearLayout
     private lateinit var eventCountText: TextView
     private lateinit var notificationChip: TextView
+    private lateinit var dailySummaryText: TextView
 
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
         .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
@@ -70,6 +71,7 @@ class MainActivity : Activity() {
         requestNotificationPermissionIfNeeded()
         buildUi()
         ReminderScheduler.schedulePeriodicSync(this)
+        ReminderScheduler.scheduleDailySummary(this)
         refreshEventsList()
     }
 
@@ -93,6 +95,10 @@ class MainActivity : Activity() {
         root.addView(body, LinearLayout.LayoutParams(match(), 0, 1f))
 
         body.addView(connectionPanel())
+        addSpacer(body, 10)
+        body.addView(quickGuidePanel())
+        addSpacer(body, 10)
+        body.addView(notificationSettingsPanel())
         addSpacer(body, 10)
 
         statusText = TextView(this).apply {
@@ -121,6 +127,7 @@ class MainActivity : Activity() {
         setStatus("Dán iCal URL rồi bấm Đồng bộ.", StatusType.INFO)
         updateLastSyncStatus()
         updateNotificationChip()
+        refreshDailySummaryText()
     }
 
     private fun headerView(): View {
@@ -186,25 +193,6 @@ class MainActivity : Activity() {
         }
         panel.addView(urlInput, LinearLayout.LayoutParams(match(), wrap()))
 
-        val quickActions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, 0)
-        }
-        val openMoodleButton = secondaryButton("Mở Moodle").apply {
-            setOnClickListener { openMoodleExportPage() }
-        }
-        quickActions.addView(openMoodleButton, LinearLayout.LayoutParams(0, dp(44), 1f))
-
-        val pasteButton = outlineButton("Dán clipboard").apply {
-            setOnClickListener { pasteUrlFromClipboard() }
-        }
-        val pasteLp = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-            marginStart = dp(8)
-        }
-        quickActions.addView(pasteButton, pasteLp)
-        panel.addView(quickActions)
-
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -245,40 +233,121 @@ class MainActivity : Activity() {
         return panel
     }
 
-    private fun openMoodleExportPage() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(moodleExportUrl))
-        try {
-            startActivity(intent)
-            setStatus("Đăng nhập Moodle trong trình duyệt, bấm Copy URL rồi quay lại app.", StatusType.INFO)
-        } catch (_: Exception) {
-            setStatus("Không mở được trình duyệt trên máy này.", StatusType.ERROR)
+    private fun quickGuidePanel(): View {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(card, 8, line, 1)
+        }
+        panel.addView(TextView(this).apply {
+            text = "Hướng dẫn nhanh"
+            textSize = 15f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        addSpacer(panel, 6)
+        panel.addView(TextView(this).apply {
+            text = "1. Vào trang xuất lịch Moodle\n2. Chọn lịch cần thông báo và bấm Lấy địa chỉ mạng của lịch\n3. Copy URL, dán vào app rồi Lưu & đồng bộ"
+            textSize = 12f
+            setTextColor(muted)
+            setLineSpacing(0f, 1.08f)
+        })
+        addSpacer(panel, 8)
+
+        val links = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        links.addView(secondaryButton("Mở Moodle").apply {
+            setOnClickListener { openUrl(moodleExportUrl) }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        val guideLp = LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+            marginStart = dp(8)
+        }
+        links.addView(outlineButton("Xem GitHub").apply {
+            setOnClickListener { openUrl(githubGuideUrl) }
+        }, guideLp)
+        panel.addView(links)
+
+        addSpacer(panel, 8)
+        panel.addView(TextView(this).apply {
+            text = "Hỗ trợ: $supportContact"
+            textSize = 12f
+            setTextColor(blueDark)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        return panel
+    }
+
+    private fun notificationSettingsPanel(): View {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(card, 8, line, 1)
+        }
+        panel.addView(TextView(this).apply {
+            text = "Cài đặt thông báo"
+            textSize = 15f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        dailySummaryText = TextView(this).apply {
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(8))
+        }
+        panel.addView(dailySummaryText)
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        row.addView(timeButton("7:00", 7), LinearLayout.LayoutParams(0, dp(40), 1f))
+        row.addView(timeButton("12:00", 12), LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+            marginStart = dp(6)
+        })
+        row.addView(timeButton("20:00", 20), LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+            marginStart = dp(6)
+        })
+        row.addView(outlineButton("Tắt").apply {
+            setOnClickListener {
+                EventStore.setDailySummaryEnabled(this@MainActivity, false)
+                ReminderScheduler.scheduleDailySummary(this@MainActivity)
+                refreshDailySummaryText()
+                setStatus("Đã tắt thông báo tổng hợp hằng ngày.", StatusType.INFO)
+            }
+        }, LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+            marginStart = dp(6)
+        })
+        panel.addView(row)
+        return panel
+    }
+
+    private fun timeButton(label: String, hour: Int): Button {
+        return secondaryButton(label).apply {
+            setOnClickListener {
+                EventStore.setDailySummaryHour(this@MainActivity, hour)
+                ReminderScheduler.scheduleDailySummary(this@MainActivity)
+                refreshDailySummaryText()
+                setStatus("Đã đặt thông báo tổng hợp mỗi ngày lúc $label.", StatusType.SUCCESS)
+            }
         }
     }
 
-    private fun pasteUrlFromClipboard() {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = clipboard.primaryClip
-        val text = clip?.takeIf { it.itemCount > 0 }
-            ?.getItemAt(0)
-            ?.coerceToText(this)
-            ?.toString()
-            ?.trim()
-            .orEmpty()
-
-        if (text.isBlank()) {
-            setStatus("Clipboard đang trống. Hãy copy Calendar URL từ Moodle trước.", StatusType.ERROR)
-            return
-        }
-
-        urlInput.setText(text)
-        urlInput.setSelection(urlInput.text.length)
-        EventStore.setIcalUrl(this, text)
-
-        if (text.contains("export_execute.php", ignoreCase = true)) {
-            Toast.makeText(this, "Đã dán iCal URL", Toast.LENGTH_SHORT).show()
-            setStatus("Đã dán Calendar URL. Bấm Lưu & đồng bộ để tải lịch.", StatusType.SUCCESS)
+    private fun refreshDailySummaryText() {
+        if (!::dailySummaryText.isInitialized) return
+        dailySummaryText.text = if (EventStore.isDailySummaryEnabled(this)) {
+            "Mặc định app nhắc tổng hợp mỗi ngày 1 lần lúc ${"%02d:00".format(EventStore.getDailySummaryHour(this))}."
         } else {
-            setStatus("Đã dán clipboard, nhưng link chưa giống Calendar URL export_execute.php.", StatusType.INFO)
+            "Thông báo tổng hợp hằng ngày đang tắt. Nhắc trước hạn vẫn hoạt động."
+        }
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            setStatus("Không mở được liên kết trên máy này.", StatusType.ERROR)
         }
     }
 

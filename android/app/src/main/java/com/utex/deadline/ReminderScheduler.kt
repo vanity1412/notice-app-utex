@@ -9,9 +9,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import java.time.Duration
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 object ReminderScheduler {
+    private val localZone: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
+
     private val reminderOffsetsMinutes = listOf(
         7L * 24L * 60L,
         3L * 24L * 60L,
@@ -45,6 +50,26 @@ object ReminderScheduler {
         WorkManager.getInstance(context).enqueue(request)
     }
 
+    fun scheduleDailySummary(context: Context) {
+        val manager = WorkManager.getInstance(context)
+        if (!EventStore.isDailySummaryEnabled(context)) {
+            manager.cancelUniqueWork("ute-deadline-daily-summary")
+            return
+        }
+
+        val delayMillis = millisUntilNextDailySummary(EventStore.getDailySummaryHour(context))
+        val request = PeriodicWorkRequestBuilder<DailySummaryWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .addTag("ute-deadline-daily-summary")
+            .build()
+
+        manager.enqueueUniquePeriodicWork(
+            "ute-deadline-daily-summary",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
     fun scheduleAll(context: Context, events: List<DeadlineEvent>) {
         val now = System.currentTimeMillis()
         val manager = WorkManager.getInstance(context)
@@ -70,5 +95,14 @@ object ReminderScheduler {
                 }
             }
         }
+    }
+
+    private fun millisUntilNextDailySummary(hour: Int): Long {
+        val now = java.time.ZonedDateTime.now(localZone)
+        var next = LocalDate.now(localZone).atTime(hour.coerceIn(0, 23), 0).atZone(localZone)
+        if (!next.isAfter(now)) {
+            next = next.plusDays(1)
+        }
+        return Duration.between(now, next).toMillis().coerceAtLeast(60_000L)
     }
 }

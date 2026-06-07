@@ -10,6 +10,8 @@ object EventStore {
     private const val KEY_EVENTS = "events_json"
     private const val KEY_KNOWN_IDS = "known_ids"
     private const val KEY_LAST_SYNC = "last_sync"
+    private const val KEY_DAILY_SUMMARY_ENABLED = "daily_summary_enabled"
+    private const val KEY_DAILY_SUMMARY_HOUR = "daily_summary_hour"
 
     fun getIcalUrl(context: Context): String {
         return prefs(context).getString(KEY_ICAL_URL, "").orEmpty()
@@ -25,6 +27,25 @@ object EventStore {
 
     fun setLastSync(context: Context, millis: Long) {
         prefs(context).edit().putLong(KEY_LAST_SYNC, millis).apply()
+    }
+
+    fun isDailySummaryEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
+    }
+
+    fun setDailySummaryEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_DAILY_SUMMARY_ENABLED, enabled).apply()
+    }
+
+    fun getDailySummaryHour(context: Context): Int {
+        return prefs(context).getInt(KEY_DAILY_SUMMARY_HOUR, 7)
+    }
+
+    fun setDailySummaryHour(context: Context, hour: Int) {
+        prefs(context).edit()
+            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
+            .putInt(KEY_DAILY_SUMMARY_HOUR, hour.coerceIn(0, 23))
+            .apply()
     }
 
     fun loadEvents(context: Context): List<DeadlineEvent> {

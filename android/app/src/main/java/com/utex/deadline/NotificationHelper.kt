@@ -63,6 +63,33 @@ object NotificationHelper {
         )
     }
 
+    fun notifyDailySummary(context: Context, events: List<DeadlineEvent>) {
+        val upcoming = events
+            .filter { it.startAtMillis >= System.currentTimeMillis() - 60_000L }
+            .sortedBy { it.startAtMillis }
+            .take(3)
+
+        if (upcoming.isEmpty()) {
+            show(
+                context = context,
+                title = "UTE Notice",
+                message = "Hôm nay chưa có deadline sắp tới trong lịch đã lưu.",
+                id = stableNotificationId("daily-summary-empty")
+            )
+            return
+        }
+
+        val lines = upcoming.joinToString("\n") { event ->
+            "${event.title} - ${formatTime(event.startAtMillis)}"
+        }
+        show(
+            context = context,
+            title = "Nhắc lịch hôm nay",
+            message = "Có ${events.size} mục đang theo dõi.\n$lines",
+            id = stableNotificationId("daily-summary")
+        )
+    }
+
     private fun show(context: Context, title: String, message: String, id: Int) {
         ensureChannel(context)
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
