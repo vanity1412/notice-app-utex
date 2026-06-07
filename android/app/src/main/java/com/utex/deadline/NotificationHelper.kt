@@ -31,6 +31,18 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Báo lịch kiểm tra và deadline Moodle HCM-UTE"
+                // Bật âm thanh và rung cho channel
+                enableVibration(true)
+                enableLights(true)
+                lightColor = android.graphics.Color.BLUE
+                // Sử dụng âm thanh thông báo mặc định của hệ thống
+                setSound(
+                    android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+                    android.media.AudioAttributes.Builder()
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                )
             }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -43,7 +55,19 @@ object NotificationHelper {
             title = "Lịch mới: ${EventLabels.kind(event)}",
             message = eventMessage(context, event),
             id = stableNotificationId("new-${event.id}"),
-            targetUrl = event.sourceUrl
+            targetUrl = event.sourceUrl,
+            withSound = true
+        )
+    }
+
+    fun notifyChangedDeadline(context: Context, event: DeadlineEvent) {
+        show(
+            context = context,
+            title = "Thay đổi: ${EventLabels.kind(event)}",
+            message = "Giáo viên đã cập nhật lịch này.\n${eventMessage(context, event)}",
+            id = stableNotificationId("changed-${event.id}"),
+            targetUrl = event.sourceUrl,
+            withSound = true
         )
     }
 
@@ -53,7 +77,8 @@ object NotificationHelper {
             title = "Cảnh báo: $leadText",
             message = eventMessage(context, event),
             id = stableNotificationId("reminder-${event.id}-$leadText"),
-            targetUrl = event.sourceUrl
+            targetUrl = event.sourceUrl,
+            withSound = true
         )
     }
 
@@ -103,7 +128,7 @@ object NotificationHelper {
         )
     }
 
-    private fun show(context: Context, title: String, message: String, id: Int, targetUrl: String? = null) {
+    private fun show(context: Context, title: String, message: String, id: Int, targetUrl: String? = null, withSound: Boolean = false) {
         ensureChannel(context)
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return
@@ -118,7 +143,7 @@ object NotificationHelper {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_ute_notice)
             .setContentTitle(title)
             .setContentText(message.lineSequence().firstOrNull().orEmpty())
@@ -126,8 +151,13 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .build()
-        NotificationManagerCompat.from(context).notify(id, notification)
+        
+        // Thêm âm thanh và rung khi cần
+        if (withSound) {
+            builder.setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+        }
+        
+        NotificationManagerCompat.from(context).notify(id, builder.build())
     }
 
     fun formatTime(millis: Long): String = timeFormatter.format(Instant.ofEpochMilli(millis))

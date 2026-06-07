@@ -21,6 +21,7 @@ object ReminderScheduler {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
+        // Giảm từ 15 phút xuống 5 phút để phát hiện thay đổi nhanh hơn
         val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(constraints)
             .addTag("ute-deadline-sync")

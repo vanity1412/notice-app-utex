@@ -24,9 +24,24 @@ object DeadlineSync {
 
             val events = IcsParser.parse(ics)
             val knownIds = EventStore.getKnownIds(context)
+            val previousEvents = EventStore.loadEvents(context)
             val firstSync = knownIds.isEmpty()
             val now = System.currentTimeMillis()
+            
+            // Phát hiện deadline mới
             val newEvents = events.filter { it.startAtMillis >= now - 60_000L && it.id !in knownIds }
+            
+            // Phát hiện deadline bị thay đổi (thời gian hoặc nội dung)
+            val changedEvents = if (!firstSync) {
+                val previousMap = previousEvents.associateBy { it.id }
+                events.filter { event ->
+                    event.id in knownIds && previousMap[event.id]?.let { old ->
+                        old.startAtMillis != event.startAtMillis || 
+                        old.title != event.title ||
+                        old.description != event.description
+                    } == true
+                }
+            } else emptyList()
 
             EventStore.saveEvents(context, events)
             EventStore.saveKnownIds(context, knownIds + events.map { it.id })
@@ -41,18 +56,25 @@ object DeadlineSync {
                     NotificationHelper.notifySummary(context, events.size)
                 } else {
                     newEvents.forEach { NotificationHelper.notifyNewDeadline(context, it) }
+                    changedEvents.forEach { NotificationHelper.notifyChangedDeadline(context, it) }
                 }
             }
 
+            val totalChanges = newEvents.size + changedEvents.size
             SyncResult(
                 ok = true,
                 message = when {
-                    newEvents.isNotEmpty() && !firstSync -> "Có ${newEvents.size} deadline mới."
+                    totalChanges > 0 && !firstSync -> {
+                        val parts = mutableListOf<String>()
+                        if (newEvents.isNotEmpty()) parts += "${newEvents.size} mới"
+                        if (changedEvents.isNotEmpty()) parts += "${changedEvents.size} thay đổi"
+                        "Có ${parts.joinToString(", ")} deadline."
+                    }
                     events.isEmpty() -> "Đã kết nối Moodle nhưng chưa thấy deadline. Kiểm tra mục lịch đã chọn khi export."
                     else -> "Đã cập nhật ${events.size} deadline."
                 },
                 totalEvents = events.size,
-                newEvents = if (firstSync) 0 else newEvents.size
+                newEvents = if (firstSync) 0 else totalChanges
             )
         } catch (e: FriendlySyncException) {
             SyncResult(false, e.message ?: "Không đồng bộ được lịch Moodle.")

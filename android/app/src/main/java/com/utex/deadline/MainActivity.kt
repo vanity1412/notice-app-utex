@@ -114,17 +114,23 @@ class MainActivity : Activity() {
 
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(14), dp(16), 0)
+            setPadding(dp(12), dp(10), dp(12), 0)
         }
         root.addView(body, LinearLayout.LayoutParams(match(), 0, 1f))
 
         body.addView(tabBar())
-        addSpacer(body, 12)
+        addSpacer(body, 8)
 
         tabContent = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
-        body.addView(tabContent, LinearLayout.LayoutParams(match(), 0, 1f))
+        
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = false
+            clipToPadding = false
+            addView(tabContent)
+        }
+        body.addView(scrollView, LinearLayout.LayoutParams(match(), 0, 1f))
 
         setContentView(root)
         showCalendarTab()
@@ -167,31 +173,27 @@ class MainActivity : Activity() {
         tabContent.removeAllViews()
 
         tabContent.addView(connectionPanel())
-        addSpacer(tabContent, 10)
+        addSpacer(tabContent, 8)
 
         statusText = TextView(this).apply {
-            textSize = 13f
+            textSize = 12f
             setTextColor(blueDark)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
             background = rounded(Color.rgb(231, 242, 255), 8, Color.rgb(190, 218, 248), 1)
         }
         tabContent.addView(statusText, LinearLayout.LayoutParams(match(), wrap()))
 
-        addSpacer(tabContent, 12)
+        addSpacer(tabContent, 10)
         tabContent.addView(sectionHeader())
         addSpacer(tabContent, 8)
         tabContent.addView(filterPanel())
+        addSpacer(tabContent, 8)
 
         eventsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(4), 0, dp(16))
+            setPadding(0, 0, 0, dp(16))
         }
-        val scroll = ScrollView(this).apply {
-            isFillViewport = false
-            clipToPadding = false
-            addView(eventsContainer)
-        }
-        tabContent.addView(scroll, LinearLayout.LayoutParams(match(), 0, 1f))
+        tabContent.addView(eventsContainer, LinearLayout.LayoutParams(match(), wrap()))
 
         setStatus(calendarDefaultStatus(), StatusType.INFO)
         updateLastSyncStatus()
@@ -203,20 +205,11 @@ class MainActivity : Activity() {
         updateTabButtons()
         tabContent.removeAllViews()
 
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(16))
-        }
-        content.addView(quickGuidePanel())
-        addSpacer(content, 10)
-        content.addView(notificationSettingsPanel())
+        tabContent.addView(quickGuidePanel())
+        addSpacer(tabContent, 8)
+        tabContent.addView(notificationSettingsPanel())
+        addSpacer(tabContent, 16)
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            addView(content)
-        }
-        tabContent.addView(scroll, LinearLayout.LayoutParams(match(), match()))
         refreshDailySummaryText()
         refreshNotificationHealthText()
     }
@@ -235,32 +228,32 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(16))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
             background = rounded(blue, 0)
         }
-        header.addView(hcmuteLogoView(70), LinearLayout.LayoutParams(dp(70), dp(70)))
+        header.addView(hcmuteLogoView(48), LinearLayout.LayoutParams(dp(48), dp(48)))
 
         val textGroup = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), 0, 0, 0)
+            setPadding(dp(10), 0, 0, 0)
         }
         header.addView(textGroup, LinearLayout.LayoutParams(0, wrap(), 1f))
 
         textGroup.addView(TextView(this).apply {
             text = "UTE Notice"
-            textSize = 25f
+            textSize = 20f
             setTextColor(Color.WHITE)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             includeFontPadding = false
         })
         textGroup.addView(TextView(this).apply {
             text = "HCM-UTE Moodle Calendar"
-            textSize = 13f
+            textSize = 11f
             setTextColor(Color.rgb(218, 235, 255))
-            setPadding(0, dp(5), 0, 0)
+            setPadding(0, dp(2), 0, 0)
         })
 
-        notificationChip = chip("Đang kiểm tra thông báo", Color.WHITE, Color.argb(40, 255, 255, 255))
+        notificationChip = chip("Đang kiểm tra", Color.WHITE, Color.argb(40, 255, 255, 255))
         header.addView(notificationChip)
         return header
     }
@@ -274,7 +267,7 @@ class MainActivity : Activity() {
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(14))
+            setPadding(dp(10), dp(10), dp(10), dp(10))
             background = rounded(card, 8, line, 1)
         }
         val titleRow = LinearLayout(this).apply {
@@ -366,7 +359,7 @@ class MainActivity : Activity() {
     private fun compactConnectionRow(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
             background = rounded(card, 8, line, 1)
             setOnClickListener {
                 connectionExpanded = true
@@ -379,7 +372,7 @@ class MainActivity : Activity() {
             }
             titleRow.addView(TextView(this@MainActivity).apply {
                 text = "Kết nối Moodle"
-                textSize = 15f
+                textSize = 14f
                 setTextColor(ink)
                 setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, wrap(), 1f))
@@ -388,10 +381,10 @@ class MainActivity : Activity() {
 
             addView(TextView(this@MainActivity).apply {
                 text = MoodleUrlValidator.mask(EventStore.getIcalUrl(this@MainActivity))
-                textSize = 12f
+                textSize = 11f
                 setTextColor(muted)
-                setPadding(0, dp(6), 0, dp(8))
-                maxLines = 2
+                setPadding(0, dp(4), 0, dp(6))
+                maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
 
@@ -404,16 +397,16 @@ class MainActivity : Activity() {
                     connectionExpanded = true
                     showCalendarTab()
                 }
-            }, LinearLayout.LayoutParams(0, dp(38), 1f))
+            }, LinearLayout.LayoutParams(0, dp(34), 1f))
             actionRow.addView(outlineButton("Xóa").apply {
                 setOnClickListener { clearMoodleConnection() }
-            }, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
-                marginStart = dp(6)
+            }, LinearLayout.LayoutParams(0, dp(34), 1f).apply {
+                marginStart = dp(5)
             })
             actionRow.addView(outlineButton("Hướng dẫn").apply {
                 setOnClickListener { showGuideTab() }
-            }, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
-                marginStart = dp(6)
+            }, LinearLayout.LayoutParams(0, dp(34), 1f).apply {
+                marginStart = dp(5)
             })
             addView(actionRow)
         }
@@ -463,21 +456,21 @@ class MainActivity : Activity() {
     private fun quickGuidePanel(): View {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
             background = rounded(card, 8, line, 1)
         }
         panel.addView(TextView(this).apply {
             text = "Hướng dẫn nhanh"
-            textSize = 15f
+            textSize = 14f
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         })
-        addSpacer(panel, 6)
+        addSpacer(panel, 4)
         panel.addView(TextView(this).apply {
-            text = "1. Copy link ở dưới: https://utexlms.hcmute.edu.vn/calendar/export.php?\n2. Dán link vào trình duyệt đã đăng nhập UTExLMS để có quyền truy cập.\n3. Chọn lịch muốn thông báo, bấm Lấy địa chỉ mạng của lịch.\n4. Copy Calendar URL hiện ra, quay lại app dán vào Kết nối Moodle rồi Lưu & đồng bộ."
-            textSize = 12f
+            text = "1. Copy link ở dưới\n2. Dán vào trình duyệt đã đăng nhập UTExLMS\n3. Chọn lịch, bấm Lấy địa chỉ mạng\n4. Copy Calendar URL, dán vào app & Lưu"
+            textSize = 11f
             setTextColor(muted)
-            setLineSpacing(0f, 1.08f)
+            setLineSpacing(0f, 1.05f)
         })
         addSpacer(panel, 8)
 
@@ -543,7 +536,7 @@ class MainActivity : Activity() {
     private fun notificationSettingsPanel(): View {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
             background = rounded(card, 8, line, 1)
         }
         panel.addView(TextView(this).apply {
@@ -632,10 +625,17 @@ class MainActivity : Activity() {
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         })
-        notificationHealthText = TextView(this).apply {
-            textSize = 12f
+        addSpacer(panel, 4)
+        panel.addView(TextView(this).apply {
+            text = "App tự động kiểm tra deadline mới mỗi 15 phút khi có mạng. Khi phát hiện deadline mới hoặc giáo viên thay đổi sẽ thông báo kèm âm thanh."
+            textSize = 11f
             setTextColor(muted)
-            setPadding(0, dp(5), 0, dp(8))
+            setPadding(0, 0, 0, dp(6))
+        })
+        notificationHealthText = TextView(this).apply {
+            textSize = 11f
+            setTextColor(muted)
+            setPadding(0, 0, 0, dp(8))
         }
         panel.addView(notificationHealthText)
 
@@ -684,19 +684,19 @@ class MainActivity : Activity() {
         val notificationStatus = if (Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         ) {
-            "Thông báo: đã cấp quyền"
+            "✓ Quyền thông báo: đã cấp"
         } else {
-            "Thông báo: chưa cấp quyền"
+            "✗ Quyền thông báo: chưa cấp"
         }
         val batteryStatus = if (isIgnoringBatteryOptimizations()) {
-            "Pin: đã cho app chạy nền"
+            "✓ Tối ưu pin: đã tắt (tốt)"
         } else {
-            "Pin: nên tắt tối ưu pin để Android không chặn nhắc deadline"
+            "⚠ Tối ưu pin: nên tắt để nhận thông báo đầy đủ"
         }
         val syncStatus = EventStore.getLastSync(this).takeIf { it > 0L }?.let {
-            "Sync: lần gần nhất ${timeFormatter.format(Instant.ofEpochMilli(it))}"
-        } ?: "Sync: chưa đồng bộ thành công"
-        notificationHealthText.text = "$notificationStatus\n$batteryStatus\n$syncStatus\nMốc nhắc trước hạn: ${EventStore.reminderOffsetsText(this)}."
+            "Sync gần nhất: ${timeFormatter.format(Instant.ofEpochMilli(it))}"
+        } ?: "Chưa đồng bộ lần nào"
+        notificationHealthText.text = "$notificationStatus\n$batteryStatus\n$syncStatus\nMốc nhắc: ${EventStore.reminderOffsetsText(this)} trước hạn"
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
@@ -866,7 +866,7 @@ class MainActivity : Activity() {
     private fun sectionHeader(): View {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(8))
+            setPadding(0, 0, 0, 0)
         }
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -874,7 +874,7 @@ class MainActivity : Activity() {
         }
         titleRow.addView(TextView(this).apply {
             text = "Lịch sắp tới"
-            textSize = 18f
+            textSize = 16f
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         }, LinearLayout.LayoutParams(0, wrap(), 1f))
@@ -882,17 +882,17 @@ class MainActivity : Activity() {
         titleRow.addView(eventCountText)
         header.addView(titleRow)
         header.addView(TextView(this).apply {
-            text = "Loại lịch, môn/lớp và thời hạn được tách riêng. Mốc nhắc đang bật: ${EventStore.reminderOffsetsText(this@MainActivity)} trước hạn."
-            textSize = 12f
+            text = "Mốc nhắc: ${EventStore.reminderOffsetsText(this@MainActivity)} trước hạn"
+            textSize = 11f
             setTextColor(muted)
-            setPadding(0, dp(4), 0, dp(8))
+            setPadding(0, dp(3), 0, dp(6))
         })
         val modeRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        modeRow.addView(viewModeButton("Danh sách", EventViewMode.LIST), LinearLayout.LayoutParams(0, dp(40), 1f))
-        modeRow.addView(viewModeButton("Lịch tháng", EventViewMode.MONTH), LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+        modeRow.addView(viewModeButton("Danh sách", EventViewMode.LIST), LinearLayout.LayoutParams(0, dp(36), 1f))
+        modeRow.addView(viewModeButton("Lịch tháng", EventViewMode.MONTH), LinearLayout.LayoutParams(0, dp(36), 1f).apply {
             marginStart = dp(8)
         })
         header.addView(modeRow)
@@ -918,17 +918,17 @@ class MainActivity : Activity() {
     private fun filterPanel(): View {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
             background = rounded(card, 8, line, 1)
         }
 
         val search = EditText(this).apply {
-            hint = "Tìm theo tên bài, môn/lớp, loại deadline"
+            hint = "Tìm theo tên bài, môn/lớp"
             setSingleLine(true)
-            textSize = 13f
+            textSize = 12f
             setTextColor(ink)
             setHintTextColor(Color.rgb(148, 163, 184))
-            setPadding(dp(12), 0, dp(12), 0)
+            setPadding(dp(10), 0, dp(10), 0)
             inputType = InputType.TYPE_CLASS_TEXT
             background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
             setText(eventSearchText)
@@ -942,9 +942,9 @@ class MainActivity : Activity() {
                 }
             })
         }
-        panel.addView(search, LinearLayout.LayoutParams(match(), dp(42)))
+        panel.addView(search, LinearLayout.LayoutParams(match(), dp(38)))
 
-        addSpacer(panel, 8)
+        addSpacer(panel, 6)
         val kindRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -956,29 +956,29 @@ class MainActivity : Activity() {
             EventFilter.EXAM
         )
         filters.forEachIndexed { index, filter ->
-            kindRow.addView(filterButton(filter), LinearLayout.LayoutParams(0, dp(38), 1f).apply {
-                if (index > 0) marginStart = dp(6)
+            kindRow.addView(filterButton(filter), LinearLayout.LayoutParams(0, dp(34), 1f).apply {
+                if (index > 0) marginStart = dp(5)
             })
         }
         panel.addView(kindRow)
 
-        addSpacer(panel, 8)
+        addSpacer(panel, 6)
         val doneRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         doneRow.addView(TextView(this).apply {
-            text = if (hideDoneEvents) "Đang ẩn deadline đã xong" else "Đang hiển thị cả deadline đã xong"
-            textSize = 12f
+            text = if (hideDoneEvents) "Ẩn đã xong" else "Hiện đã xong"
+            textSize = 11f
             setTextColor(muted)
         }, LinearLayout.LayoutParams(0, wrap(), 1f))
-        doneRow.addView(secondaryButton(if (hideDoneEvents) "Hiện đã xong" else "Ẩn đã xong").apply {
+        doneRow.addView(secondaryButton(if (hideDoneEvents) "Hiện" else "Ẩn").apply {
             setOnClickListener {
                 hideDoneEvents = !hideDoneEvents
                 refreshEventsList()
                 showCalendarTab()
             }
-        }, LinearLayout.LayoutParams(dp(126), dp(38)))
+        }, LinearLayout.LayoutParams(dp(70), dp(34)))
         panel.addView(doneRow)
         return panel
     }
@@ -1120,13 +1120,13 @@ class MainActivity : Activity() {
             val date = eventDate(event)
             if (date != lastDate) {
                 eventsContainer.addView(dayGroupHeader(date), LinearLayout.LayoutParams(match(), wrap()).apply {
-                    topMargin = if (lastDate == null) 0 else dp(4)
-                    bottomMargin = dp(8)
+                    topMargin = if (lastDate == null) 0 else dp(2)
+                    bottomMargin = dp(6)
                 })
                 lastDate = date
             }
             val lp = LinearLayout.LayoutParams(match(), wrap()).apply {
-                bottomMargin = dp(10)
+                bottomMargin = dp(8)
             }
             eventsContainer.addView(eventView(event), lp)
         }
@@ -1316,7 +1316,7 @@ class MainActivity : Activity() {
         val isDone = EventStore.isDone(this, event.id)
         val cardView = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(10), dp(10), dp(12), dp(10))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
             background = rounded(if (isDone) Color.rgb(248, 250, 252) else card, 8, line, 1)
             gravity = Gravity.CENTER_VERTICAL
         }
