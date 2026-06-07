@@ -19,6 +19,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -613,18 +614,28 @@ class MainActivity : Activity() {
 
     private fun sectionHeader(): View {
         val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(8))
+        }
+        val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(6))
         }
-        header.addView(TextView(this).apply {
+        titleRow.addView(TextView(this).apply {
             text = "Lịch sắp tới"
             textSize = 18f
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         }, LinearLayout.LayoutParams(0, wrap(), 1f))
         eventCountText = chip("0 mục", blue, Color.rgb(226, 238, 252))
-        header.addView(eventCountText)
+        titleRow.addView(eventCountText)
+        header.addView(titleRow)
+        header.addView(TextView(this).apply {
+            text = "Loại lịch, môn/lớp và thời hạn được tách riêng. App luôn nhắc 1 ngày, 12 giờ và 1 giờ trước hạn."
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(4), 0, 0)
+        })
         return header
     }
 
@@ -738,6 +749,11 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         meta.addView(chip(eventKind(event), accent, tint(accent)))
+        EventLabels.course(event)?.let { course ->
+            meta.addView(chip(course, blueDark, Color.rgb(248, 250, 252)), LinearLayout.LayoutParams(wrap(), wrap()).apply {
+                marginStart = dp(6)
+            })
+        }
         info.addView(meta)
 
         info.addView(TextView(this).apply {
@@ -746,9 +762,21 @@ class MainActivity : Activity() {
             setTextColor(ink)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             setPadding(0, dp(7), 0, 0)
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END
         })
+        EventLabels.cleanDescription(event)?.let { description ->
+            info.addView(TextView(this).apply {
+                text = description
+                textSize = 12f
+                setTextColor(blueDark)
+                setPadding(0, dp(4), 0, 0)
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
         info.addView(TextView(this).apply {
-            text = "Hạn: ${timeFormatter.format(instant)}"
+            text = "${EventLabels.timeLabel(event)}: ${timeFormatter.format(instant)}"
             textSize = 13f
             setTextColor(muted)
             setPadding(0, dp(5), 0, 0)
@@ -851,21 +879,17 @@ class MainActivity : Activity() {
     }
 
     private fun eventKind(event: DeadlineEvent): String {
-        val text = "${event.title} ${event.rawType.orEmpty()}".lowercase(Locale.forLanguageTag("vi-VN"))
-        return when {
-            listOf("quiz", "test", "kiểm tra").any { text.contains(it) } -> "Kiểm tra"
-            listOf("thi", "exam").any { text.contains(it) } -> "Thi"
-            listOf("assignment", "bài nộp", "nộp", "lab", "project").any { text.contains(it) } -> "Bài nộp"
-            else -> "Deadline"
-        }
+        return EventLabels.kind(event)
     }
 
     private fun accentFor(event: DeadlineEvent): Int {
         val diff = event.startAtMillis - System.currentTimeMillis()
+        val kind = EventLabels.broadKind(event)
         return when {
             diff <= 24L * 60L * 60L * 1000L -> red
             diff <= 3L * 24L * 60L * 60L * 1000L -> amber
-            eventKind(event) == "Bài nộp" -> green
+            kind == "Bài nộp" -> green
+            kind == "Thi" -> red
             else -> blue
         }
     }

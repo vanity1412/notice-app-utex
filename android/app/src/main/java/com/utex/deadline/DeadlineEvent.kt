@@ -5,7 +5,8 @@ data class DeadlineEvent(
     val title: String,
     val startAtMillis: Long,
     val sourceUrl: String? = null,
-    val rawType: String? = null
+    val rawType: String? = null,
+    val description: String? = null
 )
 
 data class SyncResult(

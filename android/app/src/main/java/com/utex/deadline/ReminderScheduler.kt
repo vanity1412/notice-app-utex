@@ -17,11 +17,10 @@ import java.util.concurrent.TimeUnit
 object ReminderScheduler {
     private val localZone: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
 
-    private val reminderOffsetsMinutes = listOf(
-        7L * 24L * 60L,
-        3L * 24L * 60L,
-        24L * 60L,
-        2L * 60L
+    private val reminderOffsets = listOf(
+        ReminderOffset("1 ngày trước hạn", 24L * 60L),
+        ReminderOffset("12 giờ trước hạn", 12L * 60L),
+        ReminderOffset("1 giờ trước hạn", 60L)
     )
 
     fun schedulePeriodicSync(context: Context) {
@@ -78,13 +77,18 @@ object ReminderScheduler {
         val now = System.currentTimeMillis()
         val manager = WorkManager.getInstance(context)
         events.forEach { event ->
-            reminderOffsetsMinutes.forEach { offsetMinutes ->
-                val triggerAt = event.startAtMillis - offsetMinutes * 60_000L
+            reminderOffsets.forEach { offset ->
+                val triggerAt = event.startAtMillis - offset.minutes * 60_000L
                 val delay = triggerAt - now
                 if (delay > 60_000L) {
                     val data = Data.Builder()
+                        .putString("id", event.id)
                         .putString("title", event.title)
                         .putLong("startAtMillis", event.startAtMillis)
+                        .putString("sourceUrl", event.sourceUrl.orEmpty())
+                        .putString("rawType", event.rawType.orEmpty())
+                        .putString("description", event.description.orEmpty())
+                        .putString("leadText", offset.label)
                         .build()
                     val request = OneTimeWorkRequestBuilder<ReminderWorker>()
                         .setInitialDelay(delay, TimeUnit.MILLISECONDS)
@@ -92,7 +96,7 @@ object ReminderScheduler {
                         .addTag("ute-deadline-reminder")
                         .build()
                     manager.enqueueUniqueWork(
-                        "reminder-${event.id}-$offsetMinutes",
+                        "reminder-${event.id}-${offset.minutes}",
                         ExistingWorkPolicy.REPLACE,
                         request
                     )
@@ -120,4 +124,9 @@ object ReminderScheduler {
         }
         return TimeUnit.DAYS.toMillis(1)
     }
+
+    private data class ReminderOffset(
+        val label: String,
+        val minutes: Long
+    )
 }

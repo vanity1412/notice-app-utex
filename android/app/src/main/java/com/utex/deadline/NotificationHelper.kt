@@ -39,18 +39,18 @@ object NotificationHelper {
     fun notifyNewDeadline(context: Context, event: DeadlineEvent) {
         show(
             context = context,
-            title = "Deadline mới",
-            message = "${event.title}\nHạn: ${formatTime(event.startAtMillis)}",
+            title = "Lịch mới: ${EventLabels.kind(event)}",
+            message = eventMessage(event),
             id = stableNotificationId("new-${event.id}")
         )
     }
 
-    fun notifyReminder(context: Context, title: String, startAtMillis: Long) {
+    fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String) {
         show(
             context = context,
-            title = "Sắp tới hạn",
-            message = "$title\nHạn: ${formatTime(startAtMillis)}",
-            id = stableNotificationId("reminder-$title-$startAtMillis")
+            title = "Cảnh báo: $leadText",
+            message = eventMessage(event),
+            id = stableNotificationId("reminder-${event.id}-$leadText")
         )
     }
 
@@ -80,7 +80,7 @@ object NotificationHelper {
         }
 
         val lines = upcoming.joinToString("\n") { event ->
-            "${event.title} - ${formatTime(event.startAtMillis)}"
+            "- ${EventLabels.kind(event)}: ${event.title} - ${formatTime(event.startAtMillis)}"
         }
         show(
             context = context,
@@ -115,6 +115,16 @@ object NotificationHelper {
     }
 
     fun formatTime(millis: Long): String = timeFormatter.format(Instant.ofEpochMilli(millis))
+
+    private fun eventMessage(event: DeadlineEvent): String {
+        val lines = mutableListOf<String>()
+        lines += "${EventLabels.kind(event)}: ${event.title}"
+        EventLabels.course(event)?.let { lines += "Môn/Lớp: $it" }
+        EventLabels.cleanDescription(event)?.let { lines += it }
+        lines += "${EventLabels.timeLabel(event)}: ${formatTime(event.startAtMillis)}"
+        lines += "Mốc nhắc cố định: 1 ngày, 12 giờ, 1 giờ trước hạn."
+        return lines.joinToString("\n")
+    }
 
     private fun stableNotificationId(text: String): Int = abs(text.hashCode())
 }

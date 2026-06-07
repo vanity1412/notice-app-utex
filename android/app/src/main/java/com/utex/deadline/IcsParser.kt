@@ -1,6 +1,7 @@
 package com.utex.deadline
 
 import java.security.MessageDigest
+import java.text.Normalizer
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -64,7 +65,8 @@ object IcsParser {
                 title = title,
                 startAtMillis = time,
                 sourceUrl = raw["URL"],
-                rawType = raw["CATEGORIES"]
+                rawType = raw["CATEGORIES"],
+                description = raw["DESCRIPTION"]?.trim()?.takeIf { it.isNotBlank() }
             )
         }.distinctBy { it.id }.sortedBy { it.startAtMillis }
     }
@@ -115,13 +117,19 @@ object IcsParser {
     }
 
     private fun looksLikeDeadline(title: String, description: String, categories: String): Boolean {
-        val text = "$title $description $categories".lowercase(Locale.forLanguageTag("vi-VN"))
+        val text = searchable("$title $description $categories")
         val keywords = listOf(
-            "tới hạn", "đến hạn", "nộp", "bài nộp", "deadline", "due",
-            "quiz", "test", "kiểm tra", "kết thúc", "close", "closing",
-            "thi", "assignment", "lab", "tiểu luận", "project"
+            "toi han", "den han", "nop", "bai nop", "deadline", "due",
+            "quiz", "test", "kiem tra", "ket thuc", "close", "closing",
+            "thi", "assignment", "lab", "tieu luan", "project"
         )
         return keywords.any { text.contains(it) }
+    }
+
+    private fun searchable(text: String): String {
+        return Normalizer.normalize(text.lowercase(Locale.forLanguageTag("vi-VN")), Normalizer.Form.NFD)
+            .replace("\\p{M}+".toRegex(), "")
+            .replace('đ', 'd')
     }
 
     private fun decodeIcsText(input: String): String {

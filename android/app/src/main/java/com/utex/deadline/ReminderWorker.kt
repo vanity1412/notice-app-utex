@@ -8,8 +8,17 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : Worker(app
     override fun doWork(): Result {
         val title = inputData.getString("title") ?: return Result.success()
         val startAt = inputData.getLong("startAtMillis", 0L)
+        val event = DeadlineEvent(
+            id = inputData.getString("id") ?: "$title-$startAt",
+            title = title,
+            startAtMillis = startAt,
+            sourceUrl = inputData.getString("sourceUrl")?.takeIf { it.isNotBlank() },
+            rawType = inputData.getString("rawType")?.takeIf { it.isNotBlank() },
+            description = inputData.getString("description")?.takeIf { it.isNotBlank() }
+        )
+        val leadText = inputData.getString("leadText") ?: "gần tới hạn"
         if (startAt > 0L) {
-            NotificationHelper.notifyReminder(applicationContext, title, startAt)
+            NotificationHelper.notifyReminder(applicationContext, event, leadText)
         }
         return Result.success()
     }

@@ -85,7 +85,8 @@ object EventStore {
                     title = obj.optString("title"),
                     startAtMillis = obj.optLong("startAtMillis"),
                     sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() },
-                    rawType = obj.optString("rawType").takeIf { it.isNotBlank() }
+                    rawType = obj.optString("rawType").takeIf { it.isNotBlank() },
+                    description = obj.optString("description").takeIf { it.isNotBlank() }
                 )
             }.sortedBy { it.startAtMillis }
         } catch (_: Exception) {
@@ -102,6 +103,7 @@ object EventStore {
                 put("startAtMillis", event.startAtMillis)
                 put("sourceUrl", event.sourceUrl ?: "")
                 put("rawType", event.rawType ?: "")
+                put("description", event.description ?: "")
             })
         }
         prefs(context).edit().putString(KEY_EVENTS, arr.toString()).apply()
