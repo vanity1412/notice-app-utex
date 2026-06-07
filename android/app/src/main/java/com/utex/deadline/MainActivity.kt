@@ -43,7 +43,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
     private val moodleExportUrl = "https://utexlms.hcmute.edu.vn/calendar/export.php?"
-    private val githubGuideUrl = "https://github.com/vanity1412/notice-app-utex"
+    private val githubGuideUrl = "https://vanity1412.github.io/notice-app-utex/"
     private val supportContact = "Vũ Văn Thông - 0968046024"
 
     private lateinit var urlInput: EditText
