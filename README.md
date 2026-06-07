@@ -14,12 +14,13 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 
 - Lưu Calendar URL/iCal URL của Moodle trong máy.
 - Tự đồng bộ lịch nền khoảng 15 phút/lần khi có mạng.
-- Hiển thị deadline sắp tới dạng thẻ dễ nhìn.
+- Hiển thị deadline sắp tới dạng thẻ dễ nhìn, có thể đổi sang chế độ lịch tháng.
 - Phân loại nhanh: bài nộp, kiểm tra, thi, deadline.
 - Thông báo khi phát hiện deadline mới.
 - Nhắc trước hạn cố định: 1 ngày, 12 giờ, 1 giờ.
 - Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 6:00.
 - Có thể chọn giờ/phút và ngày trong tuần để nhận thông báo tổng hợp.
+- Có nút gửi thông báo test và mở cài đặt pin để tránh Android chặn chạy nền.
 - Không lưu mật khẩu Moodle.
 - Không dùng `MoodleSession`/cookie trong app.
 
@@ -80,6 +81,8 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 - Bấm các nút **T2, T3, T4, T5, T6, T7, CN** để chọn ngày nhận thông báo.
 - Bấm **Mỗi ngày** để bật đủ cả tuần, hoặc **Tắt** để tắt thông báo tổng hợp.
 - Các nhắc trước hạn riêng lẻ luôn được giữ: 1 ngày, 12 giờ và 1 giờ trước deadline.
+- Bấm **Gửi test** để kiểm tra điện thoại có nhận thông báo không.
+- Bấm **Cài đặt pin** và cho phép app chạy nền nếu máy hay tự tắt ứng dụng.
 - Nếu không nhận được thông báo, kiểm tra quyền thông báo của Android cho app **UTE Notice**.
 
 ## Bảo Mật

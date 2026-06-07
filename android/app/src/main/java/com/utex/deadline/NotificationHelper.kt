@@ -63,6 +63,15 @@ object NotificationHelper {
         )
     }
 
+    fun notifyTest(context: Context) {
+        show(
+            context = context,
+            title = "Test thông báo UTE Notice",
+            message = "Nếu bạn thấy thông báo này thì quyền thông báo đang hoạt động.\nApp sẽ nhắc deadline ở 3 mốc: 1 ngày, 12 giờ và 1 giờ trước hạn.",
+            id = stableNotificationId("test-notification")
+        )
+    }
+
     fun notifyDailySummary(context: Context, events: List<DeadlineEvent>) {
         val upcoming = events
             .filter { it.startAtMillis >= System.currentTimeMillis() - 60_000L }

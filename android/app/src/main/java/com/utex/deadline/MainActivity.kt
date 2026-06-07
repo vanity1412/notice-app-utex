@@ -14,6 +14,8 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.text.InputType
 import android.text.TextUtils
 import android.view.Gravity
@@ -29,6 +31,8 @@ import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -45,20 +49,26 @@ class MainActivity : Activity() {
     private lateinit var eventCountText: TextView
     private lateinit var notificationChip: TextView
     private lateinit var dailySummaryText: TextView
+    private lateinit var notificationHealthText: TextView
     private lateinit var tabContent: LinearLayout
     private lateinit var calendarTab: TextView
     private lateinit var guideTab: TextView
     private var activeTab = ScreenTab.CALENDAR
     private var connectionExpanded = false
+    private var eventViewMode = EventViewMode.LIST
+    private var visibleMonth: YearMonth? = null
 
+    private val localZone = ZoneId.of("Asia/Ho_Chi_Minh")
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
-        .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+        .withZone(localZone)
     private val dayFormatter = DateTimeFormatter.ofPattern("dd", Locale.forLanguageTag("vi-VN"))
-        .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+        .withZone(localZone)
     private val monthFormatter = DateTimeFormatter.ofPattern("MM/yyyy", Locale.forLanguageTag("vi-VN"))
-        .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+        .withZone(localZone)
     private val clockFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("vi-VN"))
-        .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+        .withZone(localZone)
+    private val monthTitleFormatter = DateTimeFormatter.ofPattern("'Tháng' M yyyy", Locale.forLanguageTag("vi-VN"))
+    private val dayGroupFormatter = DateTimeFormatter.ofPattern("EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
 
     private val blue = Color.rgb(0, 82, 156)
     private val blueDark = Color.rgb(0, 54, 111)
@@ -84,6 +94,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::notificationChip.isInitialized) updateNotificationChip()
+        if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
     }
 
     private fun buildUi() {
@@ -198,6 +209,7 @@ class MainActivity : Activity() {
         }
         tabContent.addView(scroll, LinearLayout.LayoutParams(match(), match()))
         refreshDailySummaryText()
+        refreshNotificationHealthText()
     }
 
     private fun updateTabButtons() {
@@ -512,6 +524,34 @@ class MainActivity : Activity() {
             DayOption("CN", 6)
         )))
 
+        addSpacer(panel, 10)
+        panel.addView(TextView(this).apply {
+            text = "Kiểm tra hoạt động"
+            textSize = 12f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        notificationHealthText = TextView(this).apply {
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(8))
+        }
+        panel.addView(notificationHealthText)
+
+        val healthRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        healthRow.addView(primaryButton("Gửi test").apply {
+            setOnClickListener { sendTestNotification() }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        healthRow.addView(secondaryButton("Cài đặt pin").apply {
+            setOnClickListener { openBatteryOptimizationSettings() }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+            marginStart = dp(6)
+        })
+        panel.addView(healthRow)
+
         val resetButton = outlineButton("Test lại thông báo deadline mới").apply {
             setOnClickListener {
                 EventStore.resetKnownIds(this@MainActivity)
@@ -522,6 +562,63 @@ class MainActivity : Activity() {
             topMargin = dp(8)
         })
         return panel
+    }
+
+    private fun sendTestNotification() {
+        val granted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+            Toast.makeText(this, "Hãy cấp quyền thông báo rồi bấm Gửi test lại.", Toast.LENGTH_LONG).show()
+            return
+        }
+        NotificationHelper.notifyTest(this)
+        Toast.makeText(this, "Đã gửi thông báo test.", Toast.LENGTH_SHORT).show()
+        updateNotificationChip()
+        refreshNotificationHealthText()
+    }
+
+    private fun refreshNotificationHealthText() {
+        if (!::notificationHealthText.isInitialized) return
+        val notificationStatus = if (Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            "Thông báo: đã cấp quyền"
+        } else {
+            "Thông báo: chưa cấp quyền"
+        }
+        val batteryStatus = if (isIgnoringBatteryOptimizations()) {
+            "Pin: đã cho app chạy nền"
+        } else {
+            "Pin: nên tắt tối ưu pin để Android không chặn nhắc deadline"
+        }
+        notificationHealthText.text = "$notificationStatus\n$batteryStatus\nNhắc deadline luôn dùng 3 mốc: 1 ngày, 12 giờ, 1 giờ trước hạn."
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun openBatteryOptimizationSettings() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
+                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            } else {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            }
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            } catch (_: Exception) {
+                Toast.makeText(this, "Không mở được cài đặt pin trên máy này.", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun daysRow(options: List<DayOption>): View {
@@ -631,9 +728,34 @@ class MainActivity : Activity() {
             text = "Loại lịch, môn/lớp và thời hạn được tách riêng. App luôn nhắc 1 ngày, 12 giờ và 1 giờ trước hạn."
             textSize = 12f
             setTextColor(muted)
-            setPadding(0, dp(4), 0, 0)
+            setPadding(0, dp(4), 0, dp(8))
         })
+        val modeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        modeRow.addView(viewModeButton("Danh sách", EventViewMode.LIST), LinearLayout.LayoutParams(0, dp(40), 1f))
+        modeRow.addView(viewModeButton("Lịch tháng", EventViewMode.MONTH), LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+            marginStart = dp(8)
+        })
+        header.addView(modeRow)
         return header
+    }
+
+    private fun viewModeButton(text: String, mode: EventViewMode): Button {
+        val selected = eventViewMode == mode
+        return Button(this).apply {
+            this.text = text
+            textSize = 12f
+            setAllCaps(false)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setTextColor(if (selected) Color.WHITE else blue)
+            background = if (selected) rounded(blue, 8) else rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
+            setOnClickListener {
+                eventViewMode = mode
+                showCalendarTab()
+            }
+        }
     }
 
     private fun primaryButton(text: String): Button {
@@ -689,13 +811,209 @@ class MainActivity : Activity() {
             return
         }
 
+        if (eventViewMode == EventViewMode.MONTH) {
+            renderMonthView(events)
+        } else {
+            renderListView(events)
+        }
+        updateLastSyncStatus()
+    }
+
+    private fun renderListView(events: List<DeadlineEvent>) {
+        var lastDate: LocalDate? = null
         events.forEach { event ->
+            val date = eventDate(event)
+            if (date != lastDate) {
+                eventsContainer.addView(dayGroupHeader(date), LinearLayout.LayoutParams(match(), wrap()).apply {
+                    topMargin = if (lastDate == null) 0 else dp(4)
+                    bottomMargin = dp(8)
+                })
+                lastDate = date
+            }
             val lp = LinearLayout.LayoutParams(match(), wrap()).apply {
                 bottomMargin = dp(10)
             }
             eventsContainer.addView(eventView(event), lp)
         }
-        updateLastSyncStatus()
+    }
+
+    private fun renderMonthView(events: List<DeadlineEvent>) {
+        val month = visibleMonth ?: YearMonth.now(localZone)
+        visibleMonth = month
+        val monthEvents = events.filter { YearMonth.from(eventDate(it)) == month }
+        eventsContainer.addView(monthNavigation(month), LinearLayout.LayoutParams(match(), wrap()).apply {
+            bottomMargin = dp(8)
+        })
+        eventsContainer.addView(monthGrid(month, monthEvents), LinearLayout.LayoutParams(match(), wrap()))
+
+        addSpacer(eventsContainer, 10)
+        eventsContainer.addView(TextView(this).apply {
+            text = "Sự kiện trong ${monthTitleFormatter.format(month.atDay(1))}"
+            textSize = 15f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(match(), wrap()).apply {
+            bottomMargin = dp(8)
+        })
+
+        if (monthEvents.isEmpty()) {
+            eventsContainer.addView(TextView(this).apply {
+                text = "Tháng này chưa có deadline trong lịch đã đồng bộ."
+                textSize = 13f
+                setTextColor(muted)
+                gravity = Gravity.CENTER
+                setPadding(dp(12), dp(14), dp(12), dp(14))
+                background = rounded(card, 8, line, 1)
+            })
+            return
+        }
+
+        monthEvents.forEach { event ->
+            eventsContainer.addView(eventView(event), LinearLayout.LayoutParams(match(), wrap()).apply {
+                bottomMargin = dp(10)
+            })
+        }
+    }
+
+    private fun monthNavigation(month: YearMonth): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(2), 0, dp(2))
+        }
+        row.addView(outlineButton("<").apply {
+            setOnClickListener {
+                visibleMonth = month.minusMonths(1)
+                refreshEventsList()
+            }
+        }, LinearLayout.LayoutParams(dp(48), dp(38)))
+        row.addView(TextView(this).apply {
+            text = monthTitleFormatter.format(month.atDay(1))
+            textSize = 16f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(0, wrap(), 1f))
+        row.addView(secondaryButton("Tháng này").apply {
+            setOnClickListener {
+                visibleMonth = YearMonth.now(localZone)
+                refreshEventsList()
+            }
+        }, LinearLayout.LayoutParams(dp(88), dp(38)).apply {
+            marginEnd = dp(6)
+        })
+        row.addView(outlineButton(">").apply {
+            setOnClickListener {
+                visibleMonth = month.plusMonths(1)
+                refreshEventsList()
+            }
+        }, LinearLayout.LayoutParams(dp(48), dp(38)))
+        return row
+    }
+
+    private fun monthGrid(month: YearMonth, monthEvents: List<DeadlineEvent>): View {
+        val grid = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            background = rounded(card, 8, line, 1)
+        }
+        val labels = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+        val labelRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        labels.forEach { label ->
+            labelRow.addView(TextView(this).apply {
+                text = label
+                textSize = 11f
+                setTextColor(muted)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(0, dp(24), 1f))
+        }
+        grid.addView(labelRow)
+
+        val first = month.atDay(1)
+        val startOffset = first.dayOfWeek.value - 1
+        val daysInMonth = month.lengthOfMonth()
+        val eventsByDate = monthEvents.groupBy { eventDate(it) }
+        var dayNumber = 1 - startOffset
+        repeat(6) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+            repeat(7) {
+                val date = if (dayNumber in 1..daysInMonth) month.atDay(dayNumber) else null
+                val dateEvents = if (date != null) eventsByDate[date].orEmpty() else emptyList()
+                row.addView(monthCell(date, dateEvents), LinearLayout.LayoutParams(0, dp(76), 1f).apply {
+                    marginStart = dp(1)
+                    marginEnd = dp(1)
+                    topMargin = dp(1)
+                    bottomMargin = dp(1)
+                })
+                dayNumber += 1
+            }
+            grid.addView(row)
+        }
+        return grid
+    }
+
+    private fun monthCell(date: LocalDate?, events: List<DeadlineEvent>): View {
+        val today = LocalDate.now(localZone)
+        val hasEvents = events.isNotEmpty()
+        val backgroundColor = when {
+            date == null -> Color.rgb(248, 250, 252)
+            date == today -> Color.rgb(231, 242, 255)
+            hasEvents -> Color.rgb(255, 248, 235)
+            else -> Color.WHITE
+        }
+        val strokeColor = when {
+            date == today -> blue
+            hasEvents -> Color.rgb(245, 166, 35)
+            else -> line
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = rounded(backgroundColor, 6, strokeColor, 1)
+            if (date == null) return@apply
+            addView(TextView(this@MainActivity).apply {
+                text = date.dayOfMonth.toString()
+                textSize = 12f
+                setTextColor(if (date == today) blue else ink)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            })
+            if (hasEvents) {
+                addView(TextView(this@MainActivity).apply {
+                    text = "${events.size} mục"
+                    textSize = 10f
+                    setTextColor(red)
+                    setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+                    maxLines = 1
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = events.first().title
+                    textSize = 9f
+                    setTextColor(muted)
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+            }
+        }
+    }
+
+    private fun dayGroupHeader(date: LocalDate): View {
+        return TextView(this).apply {
+            text = dayGroupFormatter.format(date)
+            textSize = 13f
+            setTextColor(blueDark)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setPadding(dp(2), dp(4), 0, 0)
+        }
+    }
+
+    private fun eventDate(event: DeadlineEvent): LocalDate {
+        return Instant.ofEpochMilli(event.startAtMillis).atZone(localZone).toLocalDate()
     }
 
     private fun eventView(event: DeadlineEvent): View {
@@ -961,6 +1279,11 @@ class MainActivity : Activity() {
     private enum class ScreenTab {
         CALENDAR,
         GUIDE
+    }
+
+    private enum class EventViewMode {
+        LIST,
+        MONTH
     }
 
     private data class DayOption(
