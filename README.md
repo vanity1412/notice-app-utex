@@ -13,16 +13,20 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 ## App Có Gì?
 
 - Lưu Calendar URL/iCal URL của Moodle trong máy.
+- Kiểm tra Calendar URL trước khi lưu, báo lỗi rõ nếu dán nhầm link hoặc thiếu token.
+- Có nút dán nhanh từ clipboard, xóa kết nối Moodle và che `authtoken` sau khi lưu.
 - Tự đồng bộ lịch nền khoảng 15 phút/lần khi có mạng.
 - Hiển thị deadline sắp tới dạng thẻ dễ nhìn, có thể đổi sang chế độ lịch tháng.
 - Phân loại nhanh: bài nộp, kiểm tra, thi, deadline.
 - Thông báo khi phát hiện deadline mới.
 - Nhắc trước hạn cố định: 1 ngày, 12 giờ, 1 giờ.
 - Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 6:00.
+- Thông báo tổng hợp chỉ tự bật sau khi đã kết nối và sync Moodle thành công.
 - Có thể chọn giờ/phút và ngày trong tuần để nhận thông báo tổng hợp.
 - Có nút gửi thông báo test và mở cài đặt pin để tránh Android chặn chạy nền.
 - Không lưu mật khẩu Moodle.
 - Không dùng `MoodleSession`/cookie trong app.
+- Calendar URL được lưu bằng EncryptedSharedPreferences khi thiết bị hỗ trợ Android Keystore.
 
 ## Cách Lấy Calendar URL Từ Moodle UTEx
 
@@ -69,13 +73,14 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 1. Cài file `UTE-Notice.apk` trên điện thoại Android.
 2. Mở app **UTE Notice**.
 3. Cấp quyền thông báo nếu Android hỏi.
-4. Dán Calendar URL đã copy từ Moodle.
+4. Dán Calendar URL đã copy từ Moodle, hoặc bấm **Dán clipboard**.
 5. Bấm **Lưu & đồng bộ**.
 6. App sẽ hiển thị lịch sắp tới và tự nhắc khi có deadline mới hoặc gần tới hạn.
 
 ## Cài Đặt Thông Báo
 
 - Mặc định app gửi thông báo tổng hợp **mỗi ngày 1 lần lúc 6:00**.
+- Trước khi bạn kết nối Moodle thành công, thông báo tổng hợp đang tắt để tránh báo rỗng.
 - Trong app, vào tab **Hướng dẫn** -> **Cài đặt thông báo**.
 - Bấm **Chọn giờ** để đặt giờ/phút cụ thể.
 - Bấm các nút **T2, T3, T4, T5, T6, T7, CN** để chọn ngày nhận thông báo.

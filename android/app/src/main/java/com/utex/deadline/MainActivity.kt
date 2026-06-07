@@ -311,6 +311,23 @@ class MainActivity : Activity() {
         }
         panel.addView(urlInput, LinearLayout.LayoutParams(match(), wrap()))
 
+        val urlActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, 0)
+        }
+        urlActions.addView(secondaryButton("Dán clipboard").apply {
+            setOnClickListener { pasteCalendarUrlFromClipboard() }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        if (hasUrl) {
+            urlActions.addView(outlineButton("Xóa kết nối").apply {
+                setOnClickListener { clearMoodleConnection() }
+            }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                marginStart = dp(8)
+            })
+        }
+        panel.addView(urlActions)
+
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -319,19 +336,14 @@ class MainActivity : Activity() {
 
         val saveButton = primaryButton("Lưu & đồng bộ").apply {
             setOnClickListener {
-                EventStore.setIcalUrl(this@MainActivity, urlInput.text.toString())
-                ReminderScheduler.schedulePeriodicSync(this@MainActivity)
-                connectionExpanded = false
-                showCalendarTab()
-                syncNow()
+                saveCalendarUrlAndSync()
             }
         }
         buttons.addView(saveButton, LinearLayout.LayoutParams(0, dp(48), 1f))
 
         val syncButton = secondaryButton("Kiểm tra").apply {
             setOnClickListener {
-                EventStore.setIcalUrl(this@MainActivity, urlInput.text.toString())
-                syncNow()
+                saveCalendarUrlAndSync()
             }
         }
         val syncLp = LinearLayout.LayoutParams(0, dp(48), 1f).apply {
@@ -344,8 +356,7 @@ class MainActivity : Activity() {
 
     private fun compactConnectionRow(): View {
         return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = rounded(card, 8, line, 1)
             setOnClickListener {
@@ -353,27 +364,91 @@ class MainActivity : Activity() {
                 showCalendarTab()
             }
 
-            addView(TextView(this@MainActivity).apply {
+            val titleRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            titleRow.addView(TextView(this@MainActivity).apply {
                 text = "Kết nối Moodle"
                 textSize = 15f
                 setTextColor(ink)
                 setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, wrap(), 1f))
+            titleRow.addView(chip("Đã kết nối", green, Color.rgb(229, 248, 239)))
+            addView(titleRow)
 
             addView(TextView(this@MainActivity).apply {
-                text = "Đã kết nối"
+                text = MoodleUrlValidator.mask(EventStore.getIcalUrl(this@MainActivity))
                 textSize = 12f
-                setTextColor(green)
-                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-                gravity = Gravity.END
-            }, LinearLayout.LayoutParams(wrap(), wrap()).apply {
-                marginEnd = dp(8)
+                setTextColor(muted)
+                setPadding(0, dp(6), 0, dp(8))
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
             })
 
-            addView(outlineButton("Hướng dẫn").apply {
+            val actionRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            actionRow.addView(secondaryButton("Chỉnh").apply {
+                setOnClickListener {
+                    connectionExpanded = true
+                    showCalendarTab()
+                }
+            }, LinearLayout.LayoutParams(0, dp(38), 1f))
+            actionRow.addView(outlineButton("Xóa").apply {
+                setOnClickListener { clearMoodleConnection() }
+            }, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+                marginStart = dp(6)
+            })
+            actionRow.addView(outlineButton("Hướng dẫn").apply {
                 setOnClickListener { showGuideTab() }
-            }, LinearLayout.LayoutParams(dp(100), dp(36)))
+            }, LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+                marginStart = dp(6)
+            })
+            addView(actionRow)
         }
+    }
+
+    private fun saveCalendarUrlAndSync() {
+        val validation = MoodleUrlValidator.validate(urlInput.text.toString())
+        if (!validation.ok) {
+            setStatus(validation.message, StatusType.ERROR)
+            urlInput.requestFocus()
+            return
+        }
+        EventStore.setIcalUrl(this, validation.normalizedUrl)
+        ReminderScheduler.schedulePeriodicSync(this)
+        connectionExpanded = false
+        showCalendarTab()
+        syncNow()
+    }
+
+    private fun pasteCalendarUrlFromClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(this)
+            ?.toString()
+            ?.trim()
+            .orEmpty()
+        if (text.isBlank()) {
+            Toast.makeText(this, "Clipboard đang trống.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        urlInput.setText(text)
+        urlInput.setSelection(urlInput.text.length)
+        val validation = MoodleUrlValidator.validate(text)
+        setStatus(validation.message, if (validation.ok) StatusType.SUCCESS else StatusType.ERROR)
+    }
+
+    private fun clearMoodleConnection() {
+        EventStore.clearConnection(this)
+        ReminderScheduler.cancelAll(this)
+        connectionExpanded = true
+        Toast.makeText(this, "Đã xóa kết nối Moodle.", Toast.LENGTH_SHORT).show()
+        showCalendarTab()
     }
 
     private fun quickGuidePanel(): View {
@@ -1147,15 +1222,21 @@ class MainActivity : Activity() {
         val lastSync = EventStore.getLastSync(this)
         val currentStatus = statusText.text.toString()
         if (lastSync > 0L && (currentStatus.startsWith("Dán") || currentStatus.startsWith("Moodle"))) {
-            setStatus("Cập nhật gần nhất: ${timeFormatter.format(Instant.ofEpochMilli(lastSync))}", StatusType.INFO)
+            val ageMillis = System.currentTimeMillis() - lastSync
+            if (ageMillis > 24L * 60L * 60L * 1000L) {
+                setStatus("Cảnh báo: lần sync gần nhất đã hơn 24 giờ (${timeFormatter.format(Instant.ofEpochMilli(lastSync))}). Bấm Kiểm tra để cập nhật lại.", StatusType.ERROR)
+            } else {
+                setStatus("Cập nhật gần nhất: ${timeFormatter.format(Instant.ofEpochMilli(lastSync))}", StatusType.INFO)
+            }
         }
     }
 
     private fun calendarDefaultStatus(): String {
-        return if (EventStore.getIcalUrl(this).isBlank()) {
+        val url = EventStore.getIcalUrl(this)
+        return if (url.isBlank()) {
             "Dán iCal URL để bắt đầu theo dõi lịch Moodle."
         } else {
-            "Moodle đã kết nối. App sẽ tự đồng bộ và nhắc lịch."
+            "Moodle đã kết nối: ${MoodleUrlValidator.mask(url)}"
         }
     }
 

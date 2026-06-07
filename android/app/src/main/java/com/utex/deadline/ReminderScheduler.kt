@@ -49,6 +49,14 @@ object ReminderScheduler {
         WorkManager.getInstance(context).enqueue(request)
     }
 
+    fun cancelAll(context: Context) {
+        val manager = WorkManager.getInstance(context)
+        manager.cancelUniqueWork("ute-deadline-periodic-sync")
+        manager.cancelUniqueWork("ute-deadline-daily-summary")
+        manager.cancelAllWorkByTag("ute-deadline-sync")
+        manager.cancelAllWorkByTag("ute-deadline-reminder")
+    }
+
     fun scheduleDailySummary(context: Context) {
         val manager = WorkManager.getInstance(context)
         if (!EventStore.isDailySummaryEnabled(context)) {
