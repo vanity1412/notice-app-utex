@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Moodle UTEx export calendar guide</title>
+  <desc id="desc">Minh họa màn hình Xuất lịch biểu trên Moodle UTEx, chọn sự kiện, chọn khoảng thời gian, lấy địa chỉ mạng của lịch và copy Calendar URL.</desc>
+  <rect width="1200" height="650" fill="#eef3f9"/>
+  <rect x="0" y="0" width="1200" height="56" fill="#0b4f7f"/>
+  <text x="48" y="36" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#ffffff">UTEx LMS</text>
+  <circle cx="1138" cy="28" r="18" fill="#d44713"/>
+  <text x="1138" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#ffffff">V</text>
+
+  <rect x="40" y="92" width="1120" height="490" fill="#ffffff" stroke="#d7e1ec"/>
+  <text x="70" y="135" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#1f2937">Xuất lịch biểu</text>
+  <text x="70" y="174" font-family="Arial, sans-serif" font-size="15" fill="#475569">Làm thế nào để đăng kí lịch này từ ứng dụng lịch (Google/Outlook/Other)?</text>
+
+  <text x="70" y="215" font-family="Arial, sans-serif" font-size="16" fill="#475569">Các sự kiện được xuất</text>
+  <circle cx="326" cy="209" r="11" fill="#e43f5a"/>
+  <text x="326" y="214" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">!</text>
+  <circle cx="380" cy="208" r="8" fill="#ffffff" stroke="#0b76d1" stroke-width="2"/>
+  <circle cx="380" cy="208" r="4" fill="#0b76d1"/>
+  <text x="398" y="213" font-family="Arial, sans-serif" font-size="16" fill="#475569">Tất cả sự kiện</text>
+  <circle cx="380" cy="248" r="8" fill="#ffffff" stroke="#64748b"/>
+  <text x="398" y="253" font-family="Arial, sans-serif" font-size="16" fill="#475569">Các sự kiện liên quan tới các danh mục</text>
+  <circle cx="380" cy="296" r="8" fill="#ffffff" stroke="#64748b"/>
+  <text x="398" y="301" font-family="Arial, sans-serif" font-size="16" fill="#475569">Sự kiện liên quan đến khoá học</text>
+  <circle cx="380" cy="344" r="8" fill="#ffffff" stroke="#64748b"/>
+  <text x="398" y="349" font-family="Arial, sans-serif" font-size="16" fill="#475569">Các sự kiện của tôi</text>
+
+  <text x="70" y="405" font-family="Arial, sans-serif" font-size="16" fill="#475569">Khoảng thời gian</text>
+  <circle cx="326" cy="399" r="11" fill="#e43f5a"/>
+  <text x="326" y="404" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">!</text>
+  <circle cx="380" cy="397" r="8" fill="#ffffff" stroke="#64748b"/>
+  <text x="398" y="402" font-family="Arial, sans-serif" font-size="16" fill="#475569">Tuần tới</text>
+  <circle cx="380" cy="438" r="8" fill="#ffffff" stroke="#0b76d1" stroke-width="2"/>
+  <circle cx="380" cy="438" r="4" fill="#0b76d1"/>
+  <text x="398" y="443" font-family="Arial, sans-serif" font-size="16" fill="#475569">Mới đây và 60 ngày tới</text>
+
+  <rect x="380" y="486" width="212" height="48" rx="4" fill="#0b73ce"/>
+  <text x="486" y="516" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Lấy địa chỉ mạng của lịch</text>
+  <rect x="602" y="486" width="80" height="48" rx="4" fill="#0b73ce"/>
+  <text x="642" y="516" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Xuất</text>
+
+  <rect x="40" y="596" width="1120" height="54" fill="#cdeff4"/>
+  <text x="70" y="630" font-family="Arial, sans-serif" font-size="16" fill="#00529c">Calendar URL</text>
+  <rect x="190" y="610" width="780" height="28" fill="#ffffff" stroke="#d7e1ec"/>
+  <text x="205" y="629" font-family="Consolas, monospace" font-size="13" fill="#1f2937">https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&amp;authtoken=...</text>
+  <rect x="990" y="606" width="126" height="36" fill="#ffffff" stroke="#475569"/>
+  <text x="1053" y="630" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#1f2937">Copy URL</text>
+</svg>
