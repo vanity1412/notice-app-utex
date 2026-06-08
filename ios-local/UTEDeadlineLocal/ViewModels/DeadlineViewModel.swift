@@ -33,20 +33,40 @@ final class DeadlineViewModel: ObservableObject {
         }
     }
 
+    enum EventViewMode: String, CaseIterable, Identifiable {
+        case list
+        case month
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .list:
+                return "Danh sách"
+            case .month:
+                return "Lịch tháng"
+            }
+        }
+    }
+
     @Published var iCalURLInput: String = ""
     @Published var statusMessage: String = "Dán iCal URL để bắt đầu theo dõi lịch Moodle."
     @Published var statusIsError = false
     @Published var events: [DeadlineEvent] = []
     @Published var isSyncing = false
+    @Published var eventViewMode: EventViewMode = .list
+    @Published var visibleMonth = Date()
     @Published var hideDoneEvents = true
     @Published var searchText = ""
     @Published var selectedFilter: EventFilter = .all
     @Published var notificationGranted = false
+    @Published var notificationFeedbackMessage = ""
     @Published var dailySummaryEnabled = false
     @Published var dailySummaryTime = Date()
 
     private let store = EventStore.shared
     private let notifier = NotificationService.shared
+    private let staleSyncInterval: TimeInterval = 30 * 60
 
     init() {
         refreshFromStore()
@@ -92,6 +112,10 @@ final class DeadlineViewModel: ObservableObject {
 
     var activeReminderOffsets: [Int] {
         store.reminderOffsetsMinutes()
+    }
+
+    var customReminderOffsets: [Int] {
+        store.customReminderOffsets()
     }
 
     let dailySummaryDays: [SummaryDay] = [
@@ -162,6 +186,14 @@ final class DeadlineViewModel: ObservableObject {
         await refreshNotificationStatus()
     }
 
+    func syncIfStale() async {
+        guard hasConnection, !isSyncing else { return }
+        if let lastSync = store.lastSync, Date().timeIntervalSince(lastSync) < staleSyncInterval {
+            return
+        }
+        await syncNow()
+    }
+
     func clearConnection() {
         store.clearConnection()
         notifier.cancelScheduledNotifications()
@@ -178,10 +210,31 @@ final class DeadlineViewModel: ObservableObject {
         await notifier.flushPendingDeadlineNotifications()
         await notifier.scheduleReminders(for: events.filter { !store.isDone($0.id) })
         await notifier.scheduleDailySummaries(events: events)
+        notificationFeedbackMessage = notificationGranted
+            ? "Đã cập nhật quyền thông báo."
+            : "iOS chưa cấp quyền thông báo cho app."
     }
 
     func refreshNotificationStatus() async {
         notificationGranted = await notifier.isAuthorized()
+    }
+
+    func sendTestNotification() async {
+        if !notificationGranted {
+            notificationGranted = await notifier.requestAuthorization()
+        }
+        let sent = await notifier.notifyTest()
+        notificationFeedbackMessage = sent
+            ? "Đã gửi thông báo test."
+            : "Chưa gửi được test. Hãy kiểm tra quyền thông báo trong Cài đặt iOS."
+        await refreshNotificationStatus()
+    }
+
+    func resetKnownIdsForNotificationTest() {
+        store.resetKnownIds()
+        statusMessage = "Đã reset danh sách deadline đã biết. Bấm đồng bộ để test cảnh báo lịch mới."
+        notificationFeedbackMessage = "Đã reset danh sách deadline đã biết. Bấm đồng bộ để test cảnh báo lịch mới."
+        statusIsError = false
     }
 
     func toggleDone(_ event: DeadlineEvent) {
@@ -250,6 +303,34 @@ final class DeadlineViewModel: ObservableObject {
 
     func setReminderOffset(_ minutes: Int, enabled: Bool) {
         store.setReminderOffset(minutes, enabled: enabled)
+        Task {
+            await notifier.scheduleReminders(for: events.filter { !store.isDone($0.id) })
+        }
+        objectWillChange.send()
+    }
+
+    func addCustomReminder(days: Int, hours: Int, minutes: Int) -> String {
+        let safeDays = max(0, days)
+        let safeHours = max(0, hours)
+        let safeMinutes = max(0, minutes)
+        let total = safeDays * 24 * 60 + safeHours * 60 + safeMinutes
+        guard total > 0 else {
+            return "Hãy nhập mốc nhắc lớn hơn 0 phút."
+        }
+        guard total <= 30 * 24 * 60 else {
+            return "Mốc nhắc tối đa 30 ngày."
+        }
+
+        store.addCustomReminderOffset(total)
+        Task {
+            await notifier.scheduleReminders(for: events.filter { !store.isDone($0.id) })
+        }
+        objectWillChange.send()
+        return "Đã thêm mốc \(store.reminderOptionLabel(total))."
+    }
+
+    func removeCustomReminder(_ minutes: Int) {
+        store.removeCustomReminderOffset(minutes)
         Task {
             await notifier.scheduleReminders(for: events.filter { !store.isDone($0.id) })
         }

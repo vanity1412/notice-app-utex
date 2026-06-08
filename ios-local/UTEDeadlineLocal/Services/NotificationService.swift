@@ -9,6 +9,7 @@ final class NotificationService {
     private let store = EventStore.shared
     private let localTimeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh") ?? .current
     private let maxReminderNotifications = 55
+    private let pendingDeadlineLifetime: TimeInterval = 3 * 24 * 60 * 60
 
     private lazy var timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -39,6 +40,7 @@ final class NotificationService {
 
     @discardableResult
     func notifyNewDeadline(_ event: DeadlineEvent) async -> Bool {
+        guard !store.isDone(event.id) else { return true }
         await showNow(
             identifier: stableIdentifier("new-\(event.id)"),
             title: "Lịch mới: \(EventLabels.kind(for: event))",
@@ -50,6 +52,7 @@ final class NotificationService {
 
     @discardableResult
     func notifyChangedDeadline(_ event: DeadlineEvent) async -> Bool {
+        guard !store.isDone(event.id) else { return true }
         await showNow(
             identifier: stableIdentifier("changed-\(event.id)"),
             title: "Thay đổi: \(EventLabels.kind(for: event))",
@@ -67,6 +70,17 @@ final class NotificationService {
             body: "Đã tìm thấy \(count) deadline sắp tới. App sẽ nhắc khi gần tới hạn.",
             url: nil,
             withSound: false
+        )
+    }
+
+    @discardableResult
+    func notifyTest() async -> Bool {
+        await showNow(
+            identifier: stableIdentifier("test-notification"),
+            title: "Test thông báo UTE Notice",
+            body: "Nếu bạn thấy thông báo này thì quyền thông báo đang hoạt động.\nMốc nhắc đang bật: \(activeReminderText()) trước hạn.",
+            url: nil,
+            withSound: true
         )
     }
 
@@ -91,7 +105,15 @@ final class NotificationService {
 
         var remaining: [PendingDeadlineNotification] = []
         var sent = 0
+        let now = Date()
         for item in pending {
+            if let timestamp = item.timestamp, now.timeIntervalSince(timestamp) > pendingDeadlineLifetime {
+                continue
+            }
+            if store.isDone(item.event.id) {
+                continue
+            }
+
             let shown: Bool
             switch item.kind {
             case .new:
@@ -211,8 +233,15 @@ final class NotificationService {
             lines.append(description)
         }
         lines.append("\(EventLabels.timeLabel(for: event)): \(timeFormatter.string(from: event.startAt))")
-        lines.append("Mốc nhắc đang bật: \(store.reminderOffsetsMinutes().map { store.reminderOptionLabel($0) }.joined(separator: ", ")) trước hạn.")
+        lines.append("Mốc nhắc đang bật: \(activeReminderText()) trước hạn.")
         return lines.joined(separator: "\n")
+    }
+
+    private func activeReminderText() -> String {
+        let text = store.reminderOffsetsMinutes()
+            .map { store.reminderOptionLabel($0) }
+            .joined(separator: ", ")
+        return text.isEmpty ? "1 giờ" : text
     }
 
     private func dailySummaryContent(events: [DeadlineEvent], referenceDate: Date) -> (title: String, body: String)? {

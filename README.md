@@ -114,6 +114,15 @@ https://utexlms.hcmute.edu.vn/calendar/export_execute.php?userid=...&authtoken=.
 6. Khi chạy xong, tải artifact `UTE-Notice-apk`.
 7. Giải nén artifact để lấy `UTE-Notice.apk`.
 
+## Build iOS Bằng GitHub Actions
+
+Workflow **Build iOS App** nằm ở `.github/workflows/build-ios.yml`.
+
+- Khi push lên `main`/`master`, workflow sẽ build app iOS trong `ios-local/` và upload artifact `UTE-Notice-ios`.
+- Mặc định workflow tạo bản unsigned để kiểm tra build.
+- Muốn tạo `.ipa` cài được trên iPhone thật, cần cấu hình Apple signing secrets như hướng dẫn trong `docs/BUILD_IOS_GITHUB.md`.
+- iOS không cho app local-only sync nền chính xác mỗi 5 phút như Android; app dùng `BGAppRefreshTask` theo cơ chế best-effort của iOS.
+
 ## Mở Code Bằng Android Studio
 
 1. Cài Android Studio.

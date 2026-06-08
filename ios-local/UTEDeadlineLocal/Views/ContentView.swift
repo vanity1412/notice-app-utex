@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: DeadlineViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView {
@@ -17,6 +18,14 @@ struct ContentView: View {
         }
         .task {
             await viewModel.refreshNotificationStatus()
+            await viewModel.syncIfStale()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task {
+                await viewModel.refreshNotificationStatus()
+                await viewModel.syncIfStale()
+            }
         }
     }
 }
@@ -102,6 +111,13 @@ private struct CalendarScreen: View {
                 .disableAutocorrection(true)
                 .textFieldStyle(.roundedBorder)
 
+            Picker("Chế độ xem", selection: $viewModel.eventViewMode) {
+                ForEach(DeadlineViewModel.EventViewMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
             Picker("Loại", selection: $viewModel.selectedFilter) {
                 ForEach(DeadlineViewModel.EventFilter.allCases) { filter in
                     Text(filter.label).tag(filter)
@@ -147,6 +163,8 @@ private struct CalendarScreen: View {
                     title: "Không có mục phù hợp",
                     message: "Thử đổi từ khóa, bộ lọc hoặc bấm Hiện đã xong."
                 )
+            } else if viewModel.eventViewMode == .month {
+                MonthCalendarView()
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(viewModel.filteredEvents) { event in
@@ -156,6 +174,204 @@ private struct CalendarScreen: View {
             }
         }
     }
+}
+
+private struct MonthCalendarView: View {
+    @EnvironmentObject private var viewModel: DeadlineViewModel
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+    private let weekdays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh") ?? .current
+        calendar.firstWeekday = 2
+        return calendar
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            monthControls
+
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(weekdays, id: \.self) { label in
+                    Text(label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+
+                ForEach(Array(monthDates.enumerated()), id: \.offset) { _, date in
+                    MonthDayCell(
+                        date: date,
+                        events: date.map(eventsForDate) ?? [],
+                        isToday: date.map(calendar.isDateInToday) ?? false,
+                        isCurrentMonth: date.map(isInVisibleMonth) ?? false
+                    )
+                }
+            }
+
+            Text("Sự kiện trong \(monthTitle)")
+                .font(.subheadline.weight(.semibold))
+                .padding(.top, 4)
+
+            let monthEvents = filteredEventsInVisibleMonth
+            if monthEvents.isEmpty {
+                Text("Không có deadline phù hợp trong tháng này.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(12)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(monthEvents) { event in
+                        EventRow(event: event)
+                    }
+                }
+            }
+        }
+    }
+
+    private var monthControls: some View {
+        HStack(spacing: 8) {
+            Button {
+                moveMonth(by: -1)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .buttonStyle(.bordered)
+
+            Text(monthTitle)
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+
+            Button("Tháng này") {
+                viewModel.visibleMonth = Date()
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                moveMonth(by: 1)
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private var monthTitle: String {
+        Self.monthTitleFormatter.string(from: viewModel.visibleMonth)
+    }
+
+    private var monthDates: [Date?] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: viewModel.visibleMonth),
+              let firstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start)
+        else {
+            return []
+        }
+
+        return (0..<42).map { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: firstWeek.start) else {
+                return nil
+            }
+            return date
+        }
+    }
+
+    private var filteredEventsInVisibleMonth: [DeadlineEvent] {
+        viewModel.filteredEvents.filter { isInVisibleMonth($0.startAt) }
+    }
+
+    private func eventsForDate(_ date: Date) -> [DeadlineEvent] {
+        viewModel.filteredEvents.filter { calendar.isDate($0.startAt, inSameDayAs: date) }
+    }
+
+    private func isInVisibleMonth(_ date: Date) -> Bool {
+        calendar.isDate(date, equalTo: viewModel.visibleMonth, toGranularity: .month)
+    }
+
+    private func moveMonth(by value: Int) {
+        if let next = calendar.date(byAdding: .month, value: value, to: viewModel.visibleMonth) {
+            viewModel.visibleMonth = next
+        }
+    }
+
+    private static let monthTitleFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")
+        formatter.dateFormat = "'Tháng' M yyyy"
+        return formatter
+    }()
+}
+
+private struct MonthDayCell: View {
+    let date: Date?
+    let events: [DeadlineEvent]
+    let isToday: Bool
+    let isCurrentMonth: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let date {
+                Text(Self.dayFormatter.string(from: date))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(isToday ? Color.blue : (isCurrentMonth ? Color.primary : Color.secondary))
+
+                if !events.isEmpty {
+                    Text("\(events.count) mục")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+
+                    Text(events[0].title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+        .padding(5)
+        .background(backgroundColor)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var backgroundColor: Color {
+        if date == nil {
+            return Color(.secondarySystemGroupedBackground)
+        }
+        if isToday {
+            return Color.blue.opacity(0.12)
+        }
+        if !events.isEmpty {
+            return Color.orange.opacity(0.10)
+        }
+        return Color(.systemBackground)
+    }
+
+    private var borderColor: Color {
+        if isToday {
+            return .blue
+        }
+        if !events.isEmpty {
+            return .orange.opacity(0.55)
+        }
+        return Color(.separator).opacity(0.35)
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")
+        formatter.dateFormat = "d"
+        return formatter
+    }()
 }
 
 private struct EmptyStateView: View {

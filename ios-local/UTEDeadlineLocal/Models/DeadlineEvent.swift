@@ -34,6 +34,14 @@ struct PendingDeadlineNotification: Codable, Hashable {
     let key: String
     let kind: Kind
     let event: DeadlineEvent
+    let timestamp: Date?
+
+    init(key: String, kind: Kind, event: DeadlineEvent, timestamp: Date? = Date()) {
+        self.key = key
+        self.kind = kind
+        self.event = event
+        self.timestamp = timestamp
+    }
 }
 
 enum EventLabels {

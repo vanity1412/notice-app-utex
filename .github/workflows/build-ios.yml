@@ -1,0 +1,182 @@
+name: Build iOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      export_method:
+        description: "Signed IPA export method when Apple signing secrets are configured"
+        required: false
+        default: development
+        type: choice
+        options:
+          - development
+          - ad-hoc
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+env:
+  IOS_PROJECT_DIR: ios-local
+  XCODE_PROJECT: UTEDeadlineLocal.xcodeproj
+  SCHEME: UTEDeadlineLocal
+  CONFIGURATION: Release
+  DERIVED_DATA_PATH: build/DerivedData
+  ARCHIVE_PATH: build/UTEDeadlineLocal.xcarchive
+  BUNDLE_ID: com.utex.deadline.ioslocal
+  EXPORT_METHOD: ${{ inputs.export_method || 'development' }}
+
+jobs:
+  build:
+    name: Build iOS artifact
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: ios-local
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+      BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: List schemes
+        run: xcodebuild -list -project "$XCODE_PROJECT"
+
+      - name: Build simulator app
+        run: |
+          xcodebuild clean build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphonesimulator \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build unsigned device app
+        run: |
+          xcodebuild clean build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p ../dist/ios/unsigned/Payload
+          APP_PATH=$(find "$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION-iphoneos" -maxdepth 1 -name "*.app" -print -quit)
+          if [ -z "$APP_PATH" ]; then
+            echo "No unsigned .app was produced."
+            exit 1
+          fi
+          cp -R "$APP_PATH" ../dist/ios/unsigned/Payload/
+          ditto -c -k --keepParent "$APP_PATH" ../dist/ios/UTE-Notice-ios-unsigned-app.zip
+          (cd ../dist/ios/unsigned && zip -qry ../UTE-Notice-ios-unsigned.ipa Payload)
+
+      - name: Prepare Apple signing assets
+        id: signing-assets
+        if: ${{ env.BUILD_CERTIFICATE_BASE64 != '' && env.BUILD_PROVISION_PROFILE_BASE64 != '' && env.P12_PASSWORD != '' && env.KEYCHAIN_PASSWORD != '' && env.APPLE_TEAM_ID != '' }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+          PROFILE_PATH="$RUNNER_TEMP/build_profile.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$PROFILE_PLIST")
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "IOS_PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "IOS_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "IOS_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "profile_name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "keychain_path=$KEYCHAIN_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed archive
+        if: ${{ steps.signing-assets.outputs.profile_name != '' }}
+        run: |
+          xcodebuild clean archive \
+            -project "$XCODE_PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination "generic/platform=iOS" \
+            -archivePath "$ARCHIVE_PATH" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME"
+
+      - name: Export signed IPA
+        if: ${{ steps.signing-assets.outputs.profile_name != '' }}
+        run: |
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>$EXPORT_METHOD</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>$IOS_PROFILE_NAME</string>
+            </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+          mkdir -p ../dist/ios/signed
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath ../dist/ios/signed \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: UTE-Notice-ios
+          path: |
+            dist/ios/UTE-Notice-ios-unsigned.ipa
+            dist/ios/UTE-Notice-ios-unsigned-app.zip
+            dist/ios/signed/*.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Clean signing keychain
+        if: ${{ always() && steps.signing-assets.outputs.keychain_path != '' }}
+        run: security delete-keychain "${{ steps.signing-assets.outputs.keychain_path }}" || true

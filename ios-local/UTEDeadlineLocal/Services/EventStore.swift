@@ -15,9 +15,20 @@ final class EventStore {
         static let dailySummaryMinute = "daily_summary_minute"
         static let dailySummaryDays = "daily_summary_days"
         static let reminderOffsets = "reminder_offsets"
+        static let customReminderOffsets = "custom_reminder_offsets"
     }
 
-    let allowedReminderMinutes: [Int] = [2 * 24 * 60, 24 * 60, 12 * 60, 3 * 60, 60, 30]
+    let presetReminderMinutes: [Int] = [
+        7 * 24 * 60,
+        3 * 24 * 60,
+        2 * 24 * 60,
+        24 * 60,
+        12 * 60,
+        6 * 60,
+        3 * 60,
+        60,
+        30
+    ]
     private let defaultReminderMinutes: [Int] = [24 * 60, 12 * 60, 60]
     private let allDaysMask = 0b1111111
     private let defaults = UserDefaults.standard
@@ -93,6 +104,10 @@ final class EventStore {
         defaults.set(date.timeIntervalSince1970, forKey: Keys.lastSync)
     }
 
+    func resetKnownIds() {
+        defaults.removeObject(forKey: Keys.knownIds)
+    }
+
     func loadPendingNotifications() -> [PendingDeadlineNotification] {
         decode([PendingDeadlineNotification].self, key: Keys.pendingNotifications, fallback: [])
     }
@@ -160,17 +175,61 @@ final class EventStore {
         return dailySummaryDaysMask & (1 << mondayBasedIndex) != 0
     }
 
+    var allowedReminderMinutes: [Int] {
+        allReminderOffsetOptions()
+    }
+
+    func allReminderOffsetOptions() -> [Int] {
+        Array(Set(presetReminderMinutes + customReminderOffsets()))
+            .filter { $0 > 0 }
+            .sorted(by: >)
+    }
+
+    func customReminderOffsets() -> [Int] {
+        (defaults.stringArray(forKey: Keys.customReminderOffsets) ?? [])
+            .compactMap { Int($0) }
+            .filter { $0 > 0 }
+            .sorted(by: >)
+    }
+
+    func addCustomReminderOffset(_ minutes: Int) {
+        guard minutes > 0 else { return }
+        var custom = Set(customReminderOffsets())
+        custom.insert(minutes)
+        defaults.set(custom.sorted(by: >).map { String($0) }, forKey: Keys.customReminderOffsets)
+
+        var selected = Set(reminderOffsetsMinutes())
+        selected.insert(minutes)
+        saveReminderOffsetsMinutes(Array(selected))
+    }
+
+    func removeCustomReminderOffset(_ minutes: Int) {
+        var custom = Set(customReminderOffsets())
+        custom.remove(minutes)
+        defaults.set(custom.sorted(by: >).map { String($0) }, forKey: Keys.customReminderOffsets)
+
+        if !presetReminderMinutes.contains(minutes) {
+            var selected = Set(reminderOffsetsMinutes())
+            selected.remove(minutes)
+            if selected.isEmpty {
+                selected.insert(60)
+            }
+            saveReminderOffsetsMinutes(Array(selected))
+        }
+    }
+
     func reminderOffsetsMinutes() -> [Int] {
+        let allOptions = allReminderOffsetOptions()
         let saved = defaults.stringArray(forKey: Keys.reminderOffsets)?
             .compactMap { Int($0) }
-            .filter { allowedReminderMinutes.contains($0) }
+            .filter { allOptions.contains($0) }
             ?? []
         let selected = saved.isEmpty ? defaultReminderMinutes : saved
-        return allowedReminderMinutes.filter { selected.contains($0) }
+        return allOptions.filter { selected.contains($0) }
     }
 
     func setReminderOffset(_ minutes: Int, enabled: Bool) {
-        guard allowedReminderMinutes.contains(minutes) else { return }
+        guard allReminderOffsetOptions().contains(minutes) else { return }
         var selected = Set(reminderOffsetsMinutes())
         if enabled {
             selected.insert(minutes)
@@ -180,17 +239,23 @@ final class EventStore {
         if selected.isEmpty {
             selected.insert(60)
         }
-        defaults.set(allowedReminderMinutes.filter { selected.contains($0) }.map { String($0) }, forKey: Keys.reminderOffsets)
+        saveReminderOffsetsMinutes(Array(selected))
     }
 
     func reminderOptionLabel(_ minutes: Int) -> String {
         switch minutes {
+        case 7 * 24 * 60:
+            return "7 ngày"
+        case 3 * 24 * 60:
+            return "3 ngày"
         case 2 * 24 * 60:
             return "2 ngày"
         case 24 * 60:
             return "1 ngày"
         case 12 * 60:
             return "12 giờ"
+        case 6 * 60:
+            return "6 giờ"
         case 3 * 60:
             return "3 giờ"
         case 60:
@@ -198,7 +263,36 @@ final class EventStore {
         case 30:
             return "30 phút"
         default:
-            return "\(minutes) phút"
+            return customReminderLabel(minutes)
+        }
+    }
+
+    private func saveReminderOffsetsMinutes(_ offsets: [Int]) {
+        let allOptions = allReminderOffsetOptions()
+        let safe = offsets
+            .filter { $0 > 0 && allOptions.contains($0) }
+            .sorted(by: >)
+        defaults.set(safe.map { String($0) }, forKey: Keys.reminderOffsets)
+    }
+
+    private func customReminderLabel(_ minutes: Int) -> String {
+        let days = minutes / (24 * 60)
+        let hours = (minutes % (24 * 60)) / 60
+        let mins = minutes % 60
+
+        switch (days, hours, mins) {
+        case let (days, 0, 0) where days > 0:
+            return "\(days) ngày"
+        case let (days, hours, 0) where days > 0:
+            return "\(days) ngày \(hours) giờ"
+        case let (days, hours, mins) where days > 0:
+            return "\(days) ngày \(hours) giờ \(mins) phút"
+        case let (0, hours, 0) where hours > 0:
+            return "\(hours) giờ"
+        case let (0, hours, mins) where hours > 0:
+            return "\(hours) giờ \(mins) phút"
+        default:
+            return "\(mins) phút"
         }
     }
 
