@@ -20,6 +20,7 @@ permissions:
   contents: read
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   IOS_PROJECT_DIR: ios-local
   XCODE_PROJECT: UTEDeadlineLocal.xcodeproj
   SCHEME: UTEDeadlineLocal
@@ -56,17 +57,33 @@ jobs:
         run: xcodebuild -list -project "$XCODE_PROJECT"
 
       - name: Build simulator app
+        shell: bash
         run: |
+          mkdir -p ../dist/ios/logs
+          LOG_PATH="../dist/ios/logs/simulator-build.log"
+          set +e
           xcodebuild clean build \
             -project "$XCODE_PROJECT" \
             -scheme "$SCHEME" \
             -configuration "$CONFIGURATION" \
             -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
             -derivedDataPath "$DERIVED_DATA_PATH" \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$LOG_PATH"
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E "error:|fatal error:" "$LOG_PATH" | tail -n 30 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | while IFS= read -r line; do
+              echo "::error ::$line"
+            done
+            exit "$STATUS"
+          fi
 
       - name: Build unsigned device app
+        shell: bash
         run: |
+          mkdir -p ../dist/ios/logs
+          LOG_PATH="../dist/ios/logs/device-build.log"
+          set +e
           xcodebuild clean build \
             -project "$XCODE_PROJECT" \
             -scheme "$SCHEME" \
@@ -76,7 +93,14 @@ jobs:
             -derivedDataPath "$DERIVED_DATA_PATH" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" 2>&1 | tee "$LOG_PATH"
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E "error:|fatal error:" "$LOG_PATH" | tail -n 30 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | while IFS= read -r line; do
+              echo "::error ::$line"
+            done
+            exit "$STATUS"
+          fi
 
       - name: Package unsigned IPA
         run: |
@@ -124,7 +148,11 @@ jobs:
 
       - name: Build signed archive
         if: ${{ steps.signing-assets.outputs.profile_name != '' }}
+        shell: bash
         run: |
+          mkdir -p ../dist/ios/logs
+          LOG_PATH="../dist/ios/logs/signed-archive.log"
+          set +e
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$SCHEME" \
@@ -133,10 +161,18 @@ jobs:
             -archivePath "$ARCHIVE_PATH" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME"
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME" 2>&1 | tee "$LOG_PATH"
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E "error:|fatal error:" "$LOG_PATH" | tail -n 30 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | while IFS= read -r line; do
+              echo "::error ::$line"
+            done
+            exit "$STATUS"
+          fi
 
       - name: Export signed IPA
         if: ${{ steps.signing-assets.outputs.profile_name != '' }}
+        shell: bash
         run: |
           cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -161,10 +197,19 @@ jobs:
           EOF
 
           mkdir -p ../dist/ios/signed
+          LOG_PATH="../dist/ios/logs/signed-export.log"
+          set +e
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath ../dist/ios/signed \
-            -exportOptionsPlist ExportOptions.plist
+            -exportOptionsPlist ExportOptions.plist 2>&1 | tee "$LOG_PATH"
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E "error:|fatal error:" "$LOG_PATH" | tail -n 30 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | while IFS= read -r line; do
+              echo "::error ::$line"
+            done
+            exit "$STATUS"
+          fi
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
@@ -176,6 +221,15 @@ jobs:
             dist/ios/signed/*.ipa
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload iOS build logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: UTE-Notice-ios-build-logs
+          path: dist/ios/logs/*.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Clean signing keychain
         if: ${{ always() && steps.signing-assets.outputs.keychain_path != '' }}
