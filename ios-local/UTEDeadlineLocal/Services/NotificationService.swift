@@ -41,7 +41,7 @@ final class NotificationService {
     @discardableResult
     func notifyNewDeadline(_ event: DeadlineEvent) async -> Bool {
         guard !store.isDone(event.id) else { return true }
-        await showNow(
+        return await showNow(
             identifier: stableIdentifier("new-\(event.id)"),
             title: "Lịch mới: \(EventLabels.kind(for: event))",
             body: eventMessage(event),
@@ -53,7 +53,7 @@ final class NotificationService {
     @discardableResult
     func notifyChangedDeadline(_ event: DeadlineEvent) async -> Bool {
         guard !store.isDone(event.id) else { return true }
-        await showNow(
+        return await showNow(
             identifier: stableIdentifier("changed-\(event.id)"),
             title: "Thay đổi: \(EventLabels.kind(for: event))",
             body: "Giáo viên đã cập nhật lịch này.\n\(eventMessage(event))",
