@@ -19,23 +19,24 @@ import java.util.Locale
 import kotlin.math.abs
 
 object NotificationHelper {
-    private const val CHANNEL_ID = "ute_deadline_channel"
+    private const val ALERT_CHANNEL_ID = "ute_deadline_alerts_v2"
+    private const val SUMMARY_CHANNEL_ID = "ute_deadline_summary_v1"
+    private val vibrationPattern = longArrayOf(0L, 280L, 160L, 280L)
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
         .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "UTE Notice",
+            val alertChannel = NotificationChannel(
+                ALERT_CHANNEL_ID,
+                "UTE Notice - Cảnh báo",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Báo lịch kiểm tra và deadline Moodle HCM-UTE"
-                // Bật âm thanh và rung cho channel
+                description = "Báo deadline mới, deadline thay đổi và nhắc trước hạn"
                 enableVibration(true)
+                setVibrationPattern(this@NotificationHelper.vibrationPattern)
                 enableLights(true)
                 lightColor = android.graphics.Color.BLUE
-                // Sử dụng âm thanh thông báo mặc định của hệ thống
                 setSound(
                     android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
                     android.media.AudioAttributes.Builder()
@@ -44,8 +45,18 @@ object NotificationHelper {
                         .build()
                 )
             }
+            val summaryChannel = NotificationChannel(
+                SUMMARY_CHANNEL_ID,
+                "UTE Notice - Tổng hợp",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Thông báo tổng hợp hằng ngày, không âm thanh và không rung"
+                setSound(null, null)
+                enableVibration(false)
+            }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(alertChannel)
+            manager.createNotificationChannel(summaryChannel)
         }
     }
 
@@ -96,7 +107,8 @@ object NotificationHelper {
             context = context,
             title = "Test thông báo UTE Notice",
             message = "Nếu bạn thấy thông báo này thì quyền thông báo đang hoạt động.\nMốc nhắc đang bật: ${EventStore.reminderOffsetsText(context)} trước hạn.",
-            id = stableNotificationId("test-notification")
+            id = stableNotificationId("test-notification"),
+            withSound = true
         )
     }
 
@@ -143,18 +155,21 @@ object NotificationHelper {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val channelId = if (withSound) ALERT_CHANNEL_ID else SUMMARY_CHANNEL_ID
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_ute_notice)
             .setContentTitle(title)
             .setContentText(message.lineSequence().firstOrNull().orEmpty())
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (withSound) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
         
-        // Thêm âm thanh và rung khi cần
         if (withSound) {
             builder.setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+            builder.setVibrate(vibrationPattern)
+        } else {
+            builder.setSilent(true)
         }
         
         NotificationManagerCompat.from(context).notify(id, builder.build())

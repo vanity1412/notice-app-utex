@@ -145,10 +145,14 @@ class MainActivity : Activity() {
             setPadding(dp(3), dp(3), dp(3), dp(3))
         }
         calendarTab = tabButton("Lịch sắp tới").apply {
-            setOnClickListener { showCalendarTab() }
+            setOnClickListener {
+                if (activeTab != ScreenTab.CALENDAR) showCalendarTab()
+            }
         }
         guideTab = tabButton("Hướng dẫn").apply {
-            setOnClickListener { showGuideTab() }
+            setOnClickListener {
+                if (activeTab != ScreenTab.GUIDE) showGuideTab()
+            }
         }
         row.addView(calendarTab, LinearLayout.LayoutParams(0, dp(42), 1f))
         row.addView(guideTab, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
@@ -627,7 +631,7 @@ class MainActivity : Activity() {
         })
         addSpacer(panel, 4)
         panel.addView(TextView(this).apply {
-            text = "App tự động kiểm tra deadline mới mỗi 15 phút khi có mạng. Khi phát hiện deadline mới hoặc giáo viên thay đổi sẽ thông báo kèm âm thanh."
+            text = "App tự động kiểm tra deadline mới khoảng mỗi 5 phút khi có mạng. Khi phát hiện deadline mới hoặc giáo viên thay đổi sẽ thông báo kèm âm thanh."
             textSize = 11f
             setTextColor(muted)
             setPadding(0, 0, 0, dp(6))
@@ -975,7 +979,6 @@ class MainActivity : Activity() {
         doneRow.addView(secondaryButton(if (hideDoneEvents) "Hiện" else "Ẩn").apply {
             setOnClickListener {
                 hideDoneEvents = !hideDoneEvents
-                refreshEventsList()
                 showCalendarTab()
             }
         }, LinearLayout.LayoutParams(dp(70), dp(34)))
@@ -994,7 +997,6 @@ class MainActivity : Activity() {
             background = if (selected) rounded(blue, 8) else rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
             setOnClickListener {
                 selectedFilter = filter
-                refreshEventsList()
                 showCalendarTab()
             }
         }
@@ -1037,6 +1039,9 @@ class MainActivity : Activity() {
         thread {
             val result = DeadlineSync.sync(this, notifyNew = true)
             runOnUiThread {
+                if (result.ok) {
+                    ReminderScheduler.reschedulePeriodicSync(this)
+                }
                 setStatus(result.message, if (result.ok) StatusType.SUCCESS else StatusType.ERROR)
                 refreshEventsList()
             }
@@ -1065,13 +1070,15 @@ class MainActivity : Activity() {
     }
 
     private fun activeEventsForReminders(): List<DeadlineEvent> {
-        return EventStore.loadEvents(this).filterNot { EventStore.isDone(this, it.id) }
+        val doneIds = EventStore.getDoneIds(this)
+        return EventStore.loadEvents(this).filterNot { it.id in doneIds }
     }
 
     private fun refreshEventsList() {
         eventsContainer.removeAllViews()
         val allEvents = EventStore.loadEvents(this)
-        val events = filterEvents(allEvents)
+        val doneIds = EventStore.getDoneIds(this)
+        val events = filterEvents(allEvents, doneIds)
         eventCountText.text = if (events.size == allEvents.size) {
             "${allEvents.size} mục"
         } else {
@@ -1089,16 +1096,15 @@ class MainActivity : Activity() {
         }
 
         if (eventViewMode == EventViewMode.MONTH) {
-            renderMonthView(events)
+            renderMonthView(events, doneIds)
         } else {
-            renderListView(events)
+            renderListView(events, doneIds)
         }
         updateLastSyncStatus()
     }
 
-    private fun filterEvents(events: List<DeadlineEvent>): List<DeadlineEvent> {
+    private fun filterEvents(events: List<DeadlineEvent>, doneIds: Set<String>): List<DeadlineEvent> {
         val query = searchable(eventSearchText.trim())
-        val doneIds = EventStore.getDoneIds(this)
         return events.filter { event ->
             val doneOk = !hideDoneEvents || event.id !in doneIds
             val kindOk = when (selectedFilter) {
@@ -1114,7 +1120,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun renderListView(events: List<DeadlineEvent>) {
+    private fun renderListView(events: List<DeadlineEvent>, doneIds: Set<String>) {
         var lastDate: LocalDate? = null
         events.forEach { event ->
             val date = eventDate(event)
@@ -1128,11 +1134,11 @@ class MainActivity : Activity() {
             val lp = LinearLayout.LayoutParams(match(), wrap()).apply {
                 bottomMargin = dp(8)
             }
-            eventsContainer.addView(eventView(event), lp)
+            eventsContainer.addView(eventView(event, event.id in doneIds), lp)
         }
     }
 
-    private fun renderMonthView(events: List<DeadlineEvent>) {
+    private fun renderMonthView(events: List<DeadlineEvent>, doneIds: Set<String>) {
         val month = visibleMonth ?: YearMonth.now(localZone)
         visibleMonth = month
         val monthEvents = events.filter { YearMonth.from(eventDate(it)) == month }
@@ -1164,7 +1170,7 @@ class MainActivity : Activity() {
         }
 
         monthEvents.forEach { event ->
-            eventsContainer.addView(eventView(event), LinearLayout.LayoutParams(match(), wrap()).apply {
+            eventsContainer.addView(eventView(event, event.id in doneIds), LinearLayout.LayoutParams(match(), wrap()).apply {
                 bottomMargin = dp(10)
             })
         }
@@ -1311,9 +1317,8 @@ class MainActivity : Activity() {
         return Instant.ofEpochMilli(event.startAtMillis).atZone(localZone).toLocalDate()
     }
 
-    private fun eventView(event: DeadlineEvent): View {
+    private fun eventView(event: DeadlineEvent, isDone: Boolean): View {
         val accent = accentFor(event)
-        val isDone = EventStore.isDone(this, event.id)
         val cardView = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(8), dp(8), dp(8), dp(8))

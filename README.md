@@ -15,7 +15,7 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 - Lưu Calendar URL/iCal URL của Moodle trong máy.
 - Kiểm tra Calendar URL trước khi lưu, báo lỗi rõ nếu dán nhầm link hoặc thiếu token.
 - Có nút dán nhanh từ clipboard, xóa kết nối Moodle và che `authtoken` sau khi lưu.
-- Tự đồng bộ lịch nền khoảng 15 phút/lần khi có mạng.
+- Tự đồng bộ lịch nền khoảng 5 phút/lần khi có mạng.
 - Hiển thị deadline sắp tới dạng thẻ dễ nhìn, có thể đổi sang chế độ lịch tháng.
 - Có ô tìm kiếm, lọc theo bài nộp/kiểm tra/thi và ẩn/hiện deadline đã đánh dấu xong.
 - Phân loại nhanh: bài nộp, kiểm tra, thi, deadline.
@@ -24,6 +24,7 @@ Liên hệ hỗ trợ khi gặp sự cố: **Vũ Văn Thông - 0968046024**
 - Nhắc trước hạn mặc định: 1 ngày, 12 giờ, 1 giờ; có thể bật thêm 2 ngày, 3 giờ, 30 phút hoặc bỏ bớt mốc.
 - Có thông báo tổng hợp hằng ngày, mặc định 1 lần/ngày lúc 6:00.
 - Thông báo tổng hợp chỉ tự bật sau khi đã kết nối và sync Moodle thành công.
+- Deadline mới, deadline thay đổi và nhắc trước hạn có âm thanh + rung; thông báo tổng hợp hằng ngày không âm thanh.
 - Có thể chọn giờ/phút và ngày trong tuần để nhận thông báo tổng hợp.
 - Có nút gửi thông báo test và mở cài đặt pin để tránh Android chặn chạy nền.
 - Không lưu mật khẩu Moodle.

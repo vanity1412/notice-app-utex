@@ -8,7 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object EventStore {
-    private const val PREFS = "ute_deadline_prefs"
+    private const val PREFS = "ute_deadline_secure_prefs"
     private const val LEGACY_PREFS = "ute_deadline_prefs"
     private const val KEY_ICAL_URL = "ical_url"
     private const val KEY_EVENTS = "events_json"
@@ -24,6 +24,12 @@ object EventStore {
     const val ALL_DAYS_MASK = 0b1111111
     private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L)
     private val ALLOWED_REMINDER_MINUTES = listOf(2L * 24L * 60L, 24L * 60L, 12L * 60L, 3L * 60L, 60L, 30L)
+    @Volatile
+    private var cachedPrefs: SharedPreferences? = null
+    @Volatile
+    private var cachedEvents: List<DeadlineEvent>? = null
+    @Volatile
+    private var cachedDoneIds: Set<String>? = null
 
     fun getIcalUrl(context: Context): String {
         return prefs(context).getString(KEY_ICAL_URL, "").orEmpty()
@@ -43,6 +49,8 @@ object EventStore {
             .remove(KEY_DONE_IDS)
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
             .apply()
+        cachedEvents = emptyList()
+        cachedDoneIds = emptySet()
         clearLegacyConnection(context)
     }
 
@@ -115,6 +123,7 @@ object EventStore {
     }
 
     fun loadEvents(context: Context): List<DeadlineEvent> {
+        cachedEvents?.let { return it }
         val json = prefs(context).getString(KEY_EVENTS, "[]").orEmpty()
         return try {
             val arr = JSONArray(json)
@@ -128,15 +137,20 @@ object EventStore {
                     rawType = obj.optString("rawType").takeIf { it.isNotBlank() },
                     description = obj.optString("description").takeIf { it.isNotBlank() }
                 )
-            }.sortedBy { it.startAtMillis }
+            }.sortedBy { it.startAtMillis }.also {
+                cachedEvents = it
+            }
         } catch (_: Exception) {
-            emptyList()
+            emptyList<DeadlineEvent>().also {
+                cachedEvents = it
+            }
         }
     }
 
     fun saveEvents(context: Context, events: List<DeadlineEvent>) {
         val arr = JSONArray()
-        events.sortedBy { it.startAtMillis }.forEach { event ->
+        val sortedEvents = events.sortedBy { it.startAtMillis }
+        sortedEvents.forEach { event ->
             arr.put(JSONObject().apply {
                 put("id", event.id)
                 put("title", event.title)
@@ -147,7 +161,8 @@ object EventStore {
             })
         }
         prefs(context).edit().putString(KEY_EVENTS, arr.toString()).apply()
-        clearDoneForMissingEvents(context, events.map { it.id }.toSet())
+        cachedEvents = sortedEvents
+        clearDoneForMissingEvents(context, sortedEvents.map { it.id }.toSet())
     }
 
     fun getKnownIds(context: Context): MutableSet<String> {
@@ -163,7 +178,10 @@ object EventStore {
     }
 
     fun getDoneIds(context: Context): Set<String> {
-        return prefs(context).getStringSet(KEY_DONE_IDS, emptySet())?.toSet() ?: emptySet()
+        cachedDoneIds?.let { return it }
+        return (prefs(context).getStringSet(KEY_DONE_IDS, emptySet())?.toSet() ?: emptySet()).also {
+            cachedDoneIds = it
+        }
     }
 
     fun isDone(context: Context, eventId: String): Boolean {
@@ -177,7 +195,9 @@ object EventStore {
         } else {
             ids -= eventId
         }
-        prefs(context).edit().putStringSet(KEY_DONE_IDS, ids).apply()
+        val nextIds = ids.toSet()
+        prefs(context).edit().putStringSet(KEY_DONE_IDS, nextIds).apply()
+        cachedDoneIds = nextIds
     }
 
     fun getReminderOffsetOptions(): List<Long> = ALLOWED_REMINDER_MINUTES
@@ -236,9 +256,21 @@ object EventStore {
     }
 
     private fun prefs(context: Context): SharedPreferences {
-        val securePrefs = securePrefs(context) ?: return legacyPrefs(context)
-        migrateLegacyPrefs(context, securePrefs)
-        return securePrefs
+        cachedPrefs?.let { return it }
+        return synchronized(this) {
+            cachedPrefs ?: run {
+                val appContext = context.applicationContext
+                val securePrefs = securePrefs(appContext)
+                val preferences = if (securePrefs != null) {
+                    migrateLegacyPrefs(appContext, securePrefs)
+                    securePrefs
+                } else {
+                    legacyPrefs(appContext)
+                }
+                cachedPrefs = preferences
+                preferences
+            }
+        }
     }
 
     private fun securePrefs(context: Context): SharedPreferences? {
@@ -300,6 +332,7 @@ object EventStore {
         val keptIds = doneIds.intersect(eventIds)
         if (keptIds.size != doneIds.size) {
             prefs(context).edit().putStringSet(KEY_DONE_IDS, keptIds).apply()
+            cachedDoneIds = keptIds
         }
     }
 
