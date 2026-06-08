@@ -19,6 +19,18 @@
             min-height: 100vh;
         }
 
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 700;
+            margin-left: 8px;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -378,11 +390,16 @@
         }
 
         .platform-btn.ios {
-            background: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
             color: white;
-            border-color: rgba(255, 255, 255, 0.5);
-            cursor: not-allowed;
-            opacity: 0.7;
+            border-color: #a855f7;
+        }
+
+        .platform-btn.ios-available {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-color: #3b82f6;
+            cursor: pointer;
         }
 
         .platform-btn.android:hover {
@@ -391,8 +408,51 @@
             box-shadow: 0 6px 24px rgba(61, 220, 132, 0.4);
         }
 
+        .platform-btn.ios-available:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4);
+        }
+
         .platform-btn.ios:hover {
             transform: none;
+        }
+
+        .zip-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .zip-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #1e293b;
+            padding: 12px 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 0.95em;
+            font-weight: 600;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .zip-btn.android-zip {
+            border-color: #3ddc84;
+        }
+
+        .zip-btn.ios-zip {
+            border-color: #3b82f6;
+        }
+
+        .zip-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            background: white;
         }
 
         .platform-icon {
@@ -544,28 +604,49 @@
             <div class="logo">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/Logo_Tr%C6%B0%E1%BB%9Dng_%C4%90%E1%BA%A1i_H%E1%BB%8Dc_S%C6%B0_Ph%E1%BA%A1m_K%E1%BB%B9_Thu%E1%BA%ADt_TP_H%E1%BB%93_Ch%C3%AD_Minh.png" alt="HCMUTE Logo">
             </div>
-            <h1>UTE Notice</h1>
+            <h1>UTE Notice <span class="version-badge">v1.1</span></h1>
             <p class="subtitle">Ứng dụng theo dõi lịch kiểm tra & deadline Moodle UTEx LMS</p>
             
             <div class="download-section">
+                <h3 style="color: white; margin-bottom: 20px; font-size: 1.4em;">📥 Tải xuống phiên bản 1.1</h3>
+                
                 <div class="platform-buttons">
-                    <a href="UTE-Notice.apk" class="platform-btn android" download>
+                    <a href="app version 1.1/UTE-Notice.apk" class="platform-btn android" download>
                         <span class="platform-icon">🤖</span>
                         <div class="platform-info">
                             <span class="platform-name">Android APK</span>
-                            <span class="platform-status">Tải xuống ngay</span>
+                            <span class="platform-status">Tải trực tiếp • v1.1</span>
                         </div>
                     </a>
-                    <div class="platform-btn ios">
+                    <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" class="platform-btn ios-available" download>
                         <span class="platform-icon">🍎</span>
                         <div class="platform-info">
-                            <span class="platform-name">iOS</span>
-                            <span class="platform-status">Đang phát triển</span>
+                            <span class="platform-name">iOS IPA</span>
+                            <span class="platform-status">Unsigned • v1.1</span>
                         </div>
+                    </a>
+                </div>
+
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.3);">
+                    <p style="color: white; font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">📦 Tải gói đầy đủ (ZIP):</p>
+                    <div class="zip-buttons">
+                        <a href="app version 1.1/UTE-Notice-apk ver1.1.zip" class="zip-btn android-zip" download>
+                            <span>📦</span>
+                            <span>Android ZIP Package</span>
+                        </a>
+                        <a href="app version 1.1/UTE-Notice-ios ver 1.1.zip" class="zip-btn ios-zip" download>
+                            <span>📦</span>
+                            <span>iOS ZIP Package</span>
+                        </a>
+                        <a href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" class="zip-btn ios-zip" download>
+                            <span>📦</span>
+                            <span>iOS Unsigned App</span>
+                        </a>
                     </div>
                 </div>
-                <p style="font-size: 0.95em; opacity: 0.85; margin-top: 8px;">
-                    Hỗ trợ Android 7.0+ | iOS sắp ra mắt
+
+                <p style="font-size: 0.95em; opacity: 0.85; margin-top: 16px; color: white;">
+                    ⚠️ iOS IPA cần Jailbreak hoặc ký lại để cài đặt | Android hỗ trợ 7.0+
                 </p>
             </div>
         </div>
@@ -575,30 +656,38 @@
                 <h2>📱 Hỗ trợ nền tảng</h2>
                 
                 <div class="feature-card" style="border-left-color: #3ddc84;">
-                    <h3><span class="feature-icon">🤖</span>Android <span class="badge">Sẵn sàng</span></h3>
+                    <h3><span class="feature-icon">🤖</span>Android <span class="badge">v1.1 Sẵn sàng</span></h3>
                     <p><strong>Yêu cầu:</strong> Android 7.0 (Nougat) trở lên</p>
                     <p><strong>Kích thước:</strong> ~8 MB</p>
                     <p><strong>Tính năng:</strong> Đầy đủ tính năng, thông báo nền, đồng bộ tự động</p>
+                    <p style="margin-top: 12px;"><strong>Tải xuống:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 8px;">
+                        <li>📥 <a href="app version 1.1/UTE-Notice.apk" download style="color: #00529c; font-weight: 600;">APK trực tiếp (v1.1)</a></li>
+                        <li>📦 <a href="app version 1.1/UTE-Notice-apk ver1.1.zip" download style="color: #00529c; font-weight: 600;">ZIP Package</a></li>
+                    </ul>
                 </div>
 
-                <div class="ios-card">
-                    <h3>🍎 iOS <span class="badge coming-soon">Sắp ra mắt</span></h3>
-                    <p>Chúng tôi đang phát triển phiên bản iOS với đầy đủ tính năng!</p>
-                    <div class="feature-list">
-                        <ul>
-                            <li>✅ Đồng bộ lịch Moodle tự động</li>
-                            <li>✅ Thông báo push thông minh</li>
-                            <li>✅ Widget iOS cho màn hình chính</li>
-                            <li>✅ Hỗ trợ Face ID / Touch ID</li>
-                            <li>✅ Giao diện native iOS</li>
+                <div class="feature-card" style="border-left-color: #3b82f6; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);">
+                    <h3><span class="feature-icon">🍎</span>iOS <span class="badge beta">v1.1 Beta</span></h3>
+                    <p><strong>Yêu cầu:</strong> iOS 14.0+ (iPhone 6s trở lên)</p>
+                    <p><strong>Kích thước:</strong> ~12 MB</p>
+                    <p><strong>Trạng thái:</strong> Phiên bản unsigned, cần ký lại hoặc Jailbreak</p>
+                    <p style="margin-top: 12px;"><strong>Tải xuống:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 8px;">
+                        <li>📥 <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" download style="color: #00529c; font-weight: 600;">IPA Unsigned (v1.1)</a></li>
+                        <li>📦 <a href="app version 1.1/UTE-Notice-ios ver 1.1.zip" download style="color: #00529c; font-weight: 600;">iOS ZIP Package</a></li>
+                        <li>📦 <a href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" download style="color: #00529c; font-weight: 600;">iOS Unsigned App ZIP</a></li>
+                    </ul>
+                    <div class="info-box" style="margin-top: 16px; background: #fef3c7; border-left-color: #f59e0b;">
+                        <p style="font-size: 0.9em; color: #78350f; margin: 0;">
+                            ⚠️ <strong>Lưu ý:</strong> File IPA chưa được ký chứng chỉ Apple. Bạn cần:
+                        </p>
+                        <ul style="margin-left: 20px; margin-top: 8px; color: #78350f; font-size: 0.9em;">
+                            <li>Sử dụng <strong>AltStore</strong>, <strong>Sideloadly</strong> hoặc <strong>Xcode</strong> để ký và cài</li>
+                            <li>Hoặc có thiết bị <strong>Jailbreak</strong></li>
+                            <li>Cần <strong>Apple ID</strong> để ký (miễn phí, tự ký được 7 ngày)</li>
                         </ul>
                     </div>
-                    <p style="font-weight: 600; margin-top: 16px;">
-                        📅 Dự kiến: Q2 2025
-                    </p>
-                    <p style="font-size: 0.95em; margin-top: 8px;">
-                        Theo dõi <a href="https://github.com/vanity1412/notice-app-utex" target="_blank" style="color: #5b21b6; text-decoration: underline;">GitHub</a> để cập nhật tiến độ
-                    </p>
                 </div>
             </div>
 
@@ -647,7 +736,8 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h4>Tải và cài đặt</h4>
-                            <p>Tải file <strong>UTE-Notice.apk</strong> về điện thoại Android và cài đặt. Cấp quyền cài đặt từ nguồn không xác định nếu cần.</p>
+                            <p><strong>Android:</strong> Tải file <a href="app version 1.1/UTE-Notice.apk" download style="color: #00529c; font-weight: 600;">UTE-Notice.apk (v1.1)</a> về điện thoại và cài đặt. Cấp quyền cài đặt từ nguồn không xác định nếu cần.</p>
+                            <p style="margin-top: 8px;"><strong>iOS:</strong> Tải file <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" download style="color: #00529c; font-weight: 600;">IPA (v1.1)</a> và ký lại bằng AltStore, Sideloadly hoặc Xcode.</p>
                         </div>
                     </div>
                     <div class="step">
@@ -741,22 +831,44 @@
             </div>
 
             <div class="bottom-download">
-                <h2>📥 Tải xuống UTE Notice</h2>
+                <h2>📥 Tải xuống UTE Notice v1.1</h2>
                 <p>Bắt đầu theo dõi deadline Moodle ngay hôm nay</p>
-                <div class="platform-buttons">
-                    <a href="UTE-Notice.apk" class="platform-btn android" download>
-                        <span class="platform-icon">🤖</span>
-                        <div class="platform-info">
-                            <span class="platform-name">Tải Android APK</span>
-                            <span class="platform-status">~8 MB • Android 7.0+</span>
-                        </div>
-                    </a>
-                    <div class="platform-btn ios">
-                        <span class="platform-icon">🍎</span>
-                        <div class="platform-info">
-                            <span class="platform-name">iOS Coming Soon</span>
-                            <span class="platform-status">Dự kiến Q2 2025</span>
-                        </div>
+                
+                <div style="margin: 24px 0;">
+                    <h3 style="color: white; font-size: 1.2em; margin-bottom: 16px;">Tải trực tiếp:</h3>
+                    <div class="platform-buttons">
+                        <a href="app version 1.1/UTE-Notice.apk" class="platform-btn android" download>
+                            <span class="platform-icon">🤖</span>
+                            <div class="platform-info">
+                                <span class="platform-name">Android APK</span>
+                                <span class="platform-status">~8 MB • Android 7.0+</span>
+                            </div>
+                        </a>
+                        <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" class="platform-btn ios-available" download>
+                            <span class="platform-icon">🍎</span>
+                            <div class="platform-info">
+                                <span class="platform-name">iOS IPA Unsigned</span>
+                                <span class="platform-status">~12 MB • iOS 14.0+</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid rgba(255,255,255,0.3);">
+                    <h3 style="color: white; font-size: 1.2em; margin-bottom: 16px;">📦 Tải gói ZIP đầy đủ:</h3>
+                    <div class="zip-buttons">
+                        <a href="app version 1.1/UTE-Notice-apk ver1.1.zip" class="zip-btn android-zip" download>
+                            <span>📦</span>
+                            <span>Android ZIP (v1.1)</span>
+                        </a>
+                        <a href="app version 1.1/UTE-Notice-ios ver 1.1.zip" class="zip-btn ios-zip" download>
+                            <span>📦</span>
+                            <span>iOS ZIP (v1.1)</span>
+                        </a>
+                        <a href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" class="zip-btn ios-zip" download>
+                            <span>📦</span>
+                            <span>iOS Unsigned App</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -764,9 +876,9 @@
 
         <!-- Sticky floating download button -->
         <div class="sticky-download" id="stickyDownload">
-            <a href="UTE-Notice.apk" class="fab-btn" download>
+            <a href="app version 1.1/UTE-Notice.apk" class="fab-btn" download>
                 <span>📥</span>
-                <span>Tải APK</span>
+                <span>Tải APK v1.1</span>
             </a>
         </div>
 
