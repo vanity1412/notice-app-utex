@@ -1,0 +1,404 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {
+    };
+    objectVersion = 56;
+    objects = {
+
+/* Begin PBXBuildFile section */
+        B000000000000000000000001 /* UTEDeadlineLocalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000001 /* UTEDeadlineLocalApp.swift */; };
+        B000000000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000002 /* AppDelegate.swift */; };
+        B000000000000000000000003 /* DeadlineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000003 /* DeadlineEvent.swift */; };
+        B000000000000000000000004 /* IcsParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000004 /* IcsParser.swift */; };
+        B000000000000000000000005 /* MoodleURLValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000005 /* MoodleURLValidator.swift */; };
+        B000000000000000000000006 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000006 /* KeychainStore.swift */; };
+        B000000000000000000000007 /* EventStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000007 /* EventStore.swift */; };
+        B000000000000000000000008 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000008 /* NotificationService.swift */; };
+        B000000000000000000000009 /* DeadlineSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000009 /* DeadlineSyncService.swift */; };
+        B00000000000000000000000A /* BackgroundRefreshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000000A /* BackgroundRefreshService.swift */; };
+        B00000000000000000000000B /* DeadlineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000000B /* DeadlineViewModel.swift */; };
+        B00000000000000000000000C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000000C /* ContentView.swift */; };
+        B00000000000000000000000D /* EventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000000D /* EventRow.swift */; };
+        B00000000000000000000000E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000000E /* SettingsView.swift */; };
+        B00000000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F000000000000000000000010 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+        F000000000000000000000001 /* UTEDeadlineLocalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UTEDeadlineLocalApp.swift; sourceTree = "<group>"; };
+        F000000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+        F000000000000000000000003 /* DeadlineEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadlineEvent.swift; sourceTree = "<group>"; };
+        F000000000000000000000004 /* IcsParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IcsParser.swift; sourceTree = "<group>"; };
+        F000000000000000000000005 /* MoodleURLValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodleURLValidator.swift; sourceTree = "<group>"; };
+        F000000000000000000000006 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+        F000000000000000000000007 /* EventStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventStore.swift; sourceTree = "<group>"; };
+        F000000000000000000000008 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+        F000000000000000000000009 /* DeadlineSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadlineSyncService.swift; sourceTree = "<group>"; };
+        F00000000000000000000000A /* BackgroundRefreshService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundRefreshService.swift; sourceTree = "<group>"; };
+        F00000000000000000000000B /* DeadlineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadlineViewModel.swift; sourceTree = "<group>"; };
+        F00000000000000000000000C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+        F00000000000000000000000D /* EventRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventRow.swift; sourceTree = "<group>"; };
+        F00000000000000000000000E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+        F00000000000000000000000F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+        F000000000000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+        F000000000000000000000011 /* UTEDeadlineLocal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = UTEDeadlineLocal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+        100000000000000000000012 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+        100000000000000000000003 = {
+            isa = PBXGroup;
+            children = (
+                100000000000000000000004 /* UTEDeadlineLocal */,
+                100000000000000000000002 /* Products */,
+            );
+            sourceTree = "<group>";
+        };
+        100000000000000000000002 /* Products */ = {
+            isa = PBXGroup;
+            children = (
+                F000000000000000000000011 /* UTEDeadlineLocal.app */,
+            );
+            name = Products;
+            sourceTree = "<group>";
+        };
+        100000000000000000000004 /* UTEDeadlineLocal */ = {
+            isa = PBXGroup;
+            children = (
+                F000000000000000000000001 /* UTEDeadlineLocalApp.swift */,
+                F000000000000000000000002 /* AppDelegate.swift */,
+                100000000000000000000005 /* Models */,
+                100000000000000000000006 /* Services */,
+                100000000000000000000007 /* ViewModels */,
+                100000000000000000000008 /* Views */,
+                F00000000000000000000000F /* Info.plist */,
+                F000000000000000000000010 /* Assets.xcassets */,
+            );
+            path = UTEDeadlineLocal;
+            sourceTree = "<group>";
+        };
+        100000000000000000000005 /* Models */ = {
+            isa = PBXGroup;
+            children = (
+                F000000000000000000000003 /* DeadlineEvent.swift */,
+            );
+            path = Models;
+            sourceTree = "<group>";
+        };
+        100000000000000000000006 /* Services */ = {
+            isa = PBXGroup;
+            children = (
+                F000000000000000000000004 /* IcsParser.swift */,
+                F000000000000000000000005 /* MoodleURLValidator.swift */,
+                F000000000000000000000006 /* KeychainStore.swift */,
+                F000000000000000000000007 /* EventStore.swift */,
+                F000000000000000000000008 /* NotificationService.swift */,
+                F000000000000000000000009 /* DeadlineSyncService.swift */,
+                F00000000000000000000000A /* BackgroundRefreshService.swift */,
+            );
+            path = Services;
+            sourceTree = "<group>";
+        };
+        100000000000000000000007 /* ViewModels */ = {
+            isa = PBXGroup;
+            children = (
+                F00000000000000000000000B /* DeadlineViewModel.swift */,
+            );
+            path = ViewModels;
+            sourceTree = "<group>";
+        };
+        100000000000000000000008 /* Views */ = {
+            isa = PBXGroup;
+            children = (
+                F00000000000000000000000C /* ContentView.swift */,
+                F00000000000000000000000D /* EventRow.swift */,
+                F00000000000000000000000E /* SettingsView.swift */,
+            );
+            path = Views;
+            sourceTree = "<group>";
+        };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+        100000000000000000000001 /* UTEDeadlineLocal */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 300000000000000000000000 /* Build configuration list for PBXNativeTarget "UTEDeadlineLocal" */;
+            buildPhases = (
+                100000000000000000000010 /* Sources */,
+                100000000000000000000012 /* Frameworks */,
+                100000000000000000000011 /* Resources */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+            );
+            name = UTEDeadlineLocal;
+            productName = UTEDeadlineLocal;
+            productReference = F000000000000000000000011 /* UTEDeadlineLocal.app */;
+            productType = "com.apple.product-type.application";
+        };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+        100000000000000000000000 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {
+                BuildIndependentTargetsInParallel = 1;
+                LastSwiftUpdateCheck = 1530;
+                LastUpgradeCheck = 1530;
+                TargetAttributes = {
+                    100000000000000000000001 = {
+                        CreatedOnToolsVersion = 15.3;
+                    };
+                };
+            };
+            buildConfigurationList = 200000000000000000000000 /* Build configuration list for PBXProject "UTEDeadlineLocal" */;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (
+                en,
+                Base,
+            );
+            mainGroup = 100000000000000000000003;
+            productRefGroup = 100000000000000000000002 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (
+                100000000000000000000001 /* UTEDeadlineLocal */,
+            );
+        };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+        100000000000000000000011 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                B00000000000000000000000F /* Assets.xcassets in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+        100000000000000000000010 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                B000000000000000000000001 /* UTEDeadlineLocalApp.swift in Sources */,
+                B000000000000000000000002 /* AppDelegate.swift in Sources */,
+                B000000000000000000000003 /* DeadlineEvent.swift in Sources */,
+                B000000000000000000000004 /* IcsParser.swift in Sources */,
+                B000000000000000000000005 /* MoodleURLValidator.swift in Sources */,
+                B000000000000000000000006 /* KeychainStore.swift in Sources */,
+                B000000000000000000000007 /* EventStore.swift in Sources */,
+                B000000000000000000000008 /* NotificationService.swift in Sources */,
+                B000000000000000000000009 /* DeadlineSyncService.swift in Sources */,
+                B00000000000000000000000A /* BackgroundRefreshService.swift in Sources */,
+                B00000000000000000000000B /* DeadlineViewModel.swift in Sources */,
+                B00000000000000000000000C /* ContentView.swift in Sources */,
+                B00000000000000000000000D /* EventRow.swift in Sources */,
+                B00000000000000000000000E /* SettingsView.swift in Sources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+        200000000000000000000001 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                CLANG_ANALYZER_NONNULL = YES;
+                CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+                CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+                CLANG_ENABLE_MODULES = YES;
+                CLANG_ENABLE_OBJC_ARC = YES;
+                CLANG_ENABLE_OBJC_WEAK = YES;
+                CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+                CLANG_WARN_BOOL_CONVERSION = YES;
+                CLANG_WARN_COMMA = YES;
+                CLANG_WARN_CONSTANT_CONVERSION = YES;
+                CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+                CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+                CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+                CLANG_WARN_EMPTY_BODY = YES;
+                CLANG_WARN_ENUM_CONVERSION = YES;
+                CLANG_WARN_INFINITE_RECURSION = YES;
+                CLANG_WARN_INT_CONVERSION = YES;
+                CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+                CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+                CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+                CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+                CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+                CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+                CLANG_WARN_STRICT_PROTOTYPES = YES;
+                CLANG_WARN_SUSPICIOUS_MOVE = YES;
+                CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+                CLANG_WARN_UNREACHABLE_CODE = YES;
+                CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_TESTABILITY = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = YES;
+                GCC_C_LANGUAGE_STANDARD = gnu17;
+                GCC_DYNAMIC_NO_PIC = NO;
+                GCC_NO_COMMON_BLOCKS = YES;
+                GCC_OPTIMIZATION_LEVEL = 0;
+                GCC_PREPROCESSOR_DEFINITIONS = (
+                    "DEBUG=1",
+                    "$(inherited)",
+                );
+                GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+                GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+                GCC_WARN_UNDECLARED_SELECTOR = YES;
+                GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+                GCC_WARN_UNUSED_FUNCTION = YES;
+                GCC_WARN_UNUSED_VARIABLE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                SDKROOT = iphoneos;
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        200000000000000000000002 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                CLANG_ANALYZER_NONNULL = YES;
+                CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+                CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+                CLANG_ENABLE_MODULES = YES;
+                CLANG_ENABLE_OBJC_ARC = YES;
+                CLANG_ENABLE_OBJC_WEAK = YES;
+                CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+                CLANG_WARN_BOOL_CONVERSION = YES;
+                CLANG_WARN_COMMA = YES;
+                CLANG_WARN_CONSTANT_CONVERSION = YES;
+                CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+                CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+                CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+                CLANG_WARN_EMPTY_BODY = YES;
+                CLANG_WARN_ENUM_CONVERSION = YES;
+                CLANG_WARN_INFINITE_RECURSION = YES;
+                CLANG_WARN_INT_CONVERSION = YES;
+                CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+                CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+                CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+                CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+                CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+                CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+                CLANG_WARN_STRICT_PROTOTYPES = YES;
+                CLANG_WARN_SUSPICIOUS_MOVE = YES;
+                CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+                CLANG_WARN_UNREACHABLE_CODE = YES;
+                CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                ENABLE_NS_ASSERTIONS = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = YES;
+                GCC_C_LANGUAGE_STANDARD = gnu17;
+                GCC_NO_COMMON_BLOCKS = YES;
+                GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+                GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+                GCC_WARN_UNDECLARED_SELECTOR = YES;
+                GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+                GCC_WARN_UNUSED_FUNCTION = YES;
+                GCC_WARN_UNUSED_VARIABLE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                SDKROOT = iphoneos;
+                SWIFT_COMPILATION_MODE = wholemodule;
+                VALIDATE_PRODUCT = YES;
+            };
+            name = Release;
+        };
+        300000000000000000000001 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_ASSET_PATHS = "";
+                DEVELOPMENT_TEAM = "";
+                ENABLE_PREVIEWS = YES;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = UTEDeadlineLocal/Info.plist;
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/Frameworks",
+                );
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.utex.deadline.ioslocal;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+        300000000000000000000002 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_ASSET_PATHS = "";
+                DEVELOPMENT_TEAM = "";
+                ENABLE_PREVIEWS = YES;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = UTEDeadlineLocal/Info.plist;
+                IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/Frameworks",
+                );
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.utex.deadline.ioslocal;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+        200000000000000000000000 /* Build configuration list for PBXProject "UTEDeadlineLocal" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                200000000000000000000001 /* Debug */,
+                200000000000000000000002 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        300000000000000000000000 /* Build configuration list for PBXNativeTarget "UTEDeadlineLocal" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                300000000000000000000001 /* Debug */,
+                300000000000000000000002 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+/* End XCConfigurationList section */
+    };
+    rootObject = 100000000000000000000000 /* Project object */;
+}

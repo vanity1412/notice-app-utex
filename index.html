@@ -298,6 +298,26 @@
                 padding: 14px 32px;
                 font-size: 1.1em;
             }
+
+            .platform-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .platform-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .sticky-download {
+                bottom: 12px;
+                right: 12px;
+            }
+
+            .fab-btn {
+                padding: 12px 20px;
+                font-size: 0.95em;
+            }
         }
 
         .badge {
@@ -309,6 +329,187 @@
             font-size: 0.85em;
             font-weight: 600;
             margin-left: 10px;
+        }
+
+        .badge.coming-soon {
+            background: #f59e0b;
+        }
+
+        .badge.beta {
+            background: #8b5cf6;
+        }
+
+        .download-section {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .platform-buttons {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .platform-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            color: #00529c;
+            padding: 16px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 1.1em;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            min-width: 200px;
+        }
+
+        .platform-btn.android {
+            background: #3ddc84;
+            color: white;
+            border-color: #3ddc84;
+        }
+
+        .platform-btn.ios {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.5);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .platform-btn.android:hover {
+            background: #2ac470;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(61, 220, 132, 0.4);
+        }
+
+        .platform-btn.ios:hover {
+            transform: none;
+        }
+
+        .platform-icon {
+            font-size: 1.8em;
+        }
+
+        .platform-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .platform-name {
+            font-size: 1.1em;
+            font-weight: 700;
+        }
+
+        .platform-status {
+            font-size: 0.8em;
+            opacity: 0.9;
+        }
+
+        .sticky-download {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(100px);
+            transition: all 0.4s ease;
+        }
+
+        .sticky-download.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .fab-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #3ddc84;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 4px 24px rgba(61, 220, 132, 0.4);
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .fab-btn:hover {
+            background: #2ac470;
+            transform: scale(1.05);
+            box-shadow: 0 6px 32px rgba(61, 220, 132, 0.5);
+        }
+
+        .fab-btn:active {
+            transform: scale(0.98);
+        }
+
+        .bottom-download {
+            background: linear-gradient(135deg, #00529c 0%, #003d75 100%);
+            padding: 40px 20px;
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 40px;
+            box-shadow: 0 8px 32px rgba(0, 82, 156, 0.2);
+        }
+
+        .bottom-download h2 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .bottom-download p {
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 24px;
+            font-size: 1.1em;
+        }
+
+        .ios-card {
+            background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+            border: 2px solid #c7d2fe;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .ios-card h3 {
+            color: #5b21b6;
+            font-size: 1.4em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .ios-card p {
+            color: #6b21a8;
+            font-size: 1.05em;
+            margin: 10px 0;
+        }
+
+        .ios-card .feature-list {
+            text-align: left;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+
+        .ios-card .feature-list li {
+            color: #6b21a8;
         }
 
         ul {
@@ -345,13 +546,62 @@
             </div>
             <h1>UTE Notice</h1>
             <p class="subtitle">Ứng dụng theo dõi lịch kiểm tra & deadline Moodle UTEx LMS</p>
-            <a href="UTE-Notice.apk" class="download-btn" download>
-                <span class="download-icon">📥</span>
-                Tải xuống APK
-            </a>
+            
+            <div class="download-section">
+                <div class="platform-buttons">
+                    <a href="UTE-Notice.apk" class="platform-btn android" download>
+                        <span class="platform-icon">🤖</span>
+                        <div class="platform-info">
+                            <span class="platform-name">Android APK</span>
+                            <span class="platform-status">Tải xuống ngay</span>
+                        </div>
+                    </a>
+                    <div class="platform-btn ios">
+                        <span class="platform-icon">🍎</span>
+                        <div class="platform-info">
+                            <span class="platform-name">iOS</span>
+                            <span class="platform-status">Đang phát triển</span>
+                        </div>
+                    </div>
+                </div>
+                <p style="font-size: 0.95em; opacity: 0.85; margin-top: 8px;">
+                    Hỗ trợ Android 7.0+ | iOS sắp ra mắt
+                </p>
+            </div>
         </div>
 
         <div class="main-content">
+            <div class="section">
+                <h2>📱 Hỗ trợ nền tảng</h2>
+                
+                <div class="feature-card" style="border-left-color: #3ddc84;">
+                    <h3><span class="feature-icon">🤖</span>Android <span class="badge">Sẵn sàng</span></h3>
+                    <p><strong>Yêu cầu:</strong> Android 7.0 (Nougat) trở lên</p>
+                    <p><strong>Kích thước:</strong> ~8 MB</p>
+                    <p><strong>Tính năng:</strong> Đầy đủ tính năng, thông báo nền, đồng bộ tự động</p>
+                </div>
+
+                <div class="ios-card">
+                    <h3>🍎 iOS <span class="badge coming-soon">Sắp ra mắt</span></h3>
+                    <p>Chúng tôi đang phát triển phiên bản iOS với đầy đủ tính năng!</p>
+                    <div class="feature-list">
+                        <ul>
+                            <li>✅ Đồng bộ lịch Moodle tự động</li>
+                            <li>✅ Thông báo push thông minh</li>
+                            <li>✅ Widget iOS cho màn hình chính</li>
+                            <li>✅ Hỗ trợ Face ID / Touch ID</li>
+                            <li>✅ Giao diện native iOS</li>
+                        </ul>
+                    </div>
+                    <p style="font-weight: 600; margin-top: 16px;">
+                        📅 Dự kiến: Q2 2025
+                    </p>
+                    <p style="font-size: 0.95em; margin-top: 8px;">
+                        Theo dõi <a href="https://github.com/vanity1412/notice-app-utex" target="_blank" style="color: #5b21b6; text-decoration: underline;">GitHub</a> để cập nhật tiến độ
+                    </p>
+                </div>
+            </div>
+
             <div class="section">
                 <h2>🎯 App có gì?</h2>
                 <div class="features">
@@ -369,7 +619,7 @@
                     </div>
                     <div class="feature-card">
                         <h3><span class="feature-icon">🔔</span>Thông báo thông minh</h3>
-                        <p>Nhắc trước hạn 1 ngày, 12 giờ, 1 giờ. Có thể tùy chỉnh thêm các mốc 2 ngày, 3 giờ, 30 phút.</p>
+                        <p>Nhắc trước hạn với các mốc có sẵn (7 ngày, 3 ngày, 2 ngày, 1 ngày, 12 giờ, 6 giờ, 3 giờ, 1 giờ, 30 phút) hoặc tự tùy chỉnh theo ngày/giờ/phút. Priority thông minh: càng gần hạn càng ưu tiên cao.</p>
                     </div>
                     <div class="feature-card">
                         <h3><span class="feature-icon">🆕</span>Phát hiện thay đổi</h3>
@@ -462,11 +712,13 @@
                     <li><strong>Phân loại thông minh:</strong> Tự động phân loại bài nộp, kiểm tra, thi và deadline thường</li>
                     <li><strong>Tìm kiếm & lọc:</strong> Ô tìm kiếm và bộ lọc giúp xem nhanh loại deadline cần theo dõi</li>
                     <li><strong>Chế độ xem linh hoạt:</strong> Chuyển đổi giữa chế độ danh sách và lịch tháng</li>
-                    <li><strong>Nhắc nhở tùy chỉnh:</strong> Bật/tắt các mốc nhắc 2 ngày, 1 ngày, 12 giờ, 3 giờ, 1 giờ, 30 phút trước hạn</li>
+                    <li><strong>Nhắc nhở tùy chỉnh:</strong> 9 mốc có sẵn (7 ngày → 30 phút) + thêm mốc tùy chỉnh theo ngày/giờ/phút bất kỳ</li>
+                    <li><strong>Priority thông minh:</strong> Deadline gần hạn (≤30 phút) có priority MAX, deadline xa hạn có priority thấp hơn</li>
                     <li><strong>Thông báo tổng hợp:</strong> Chọn giờ và ngày trong tuần để nhận báo cáo tổng hợp</li>
                     <li><strong>Kiểm tra sức khỏe:</strong> Nút test thông báo và mở cài đặt pin để đảm bảo hoạt động ổn định</li>
                     <li><strong>Mở Moodle nhanh:</strong> Mỗi deadline có nút mở trực tiếp trên Moodle</li>
                     <li><strong>Copy thông tin:</strong> Sao chép nhanh thông tin deadline để chia sẻ</li>
+                    <li><strong>Pending notifications:</strong> Thông báo không gửi được sẽ lưu lại và tự động gửi khi cấp quyền (timeout 3 ngày)</li>
                 </ul>
             </div>
 
@@ -487,6 +739,35 @@
                     <a href="https://github.com/vanity1412/notice-app-utex" target="_blank">GitHub Repository</a>
                 </p>
             </div>
+
+            <div class="bottom-download">
+                <h2>📥 Tải xuống UTE Notice</h2>
+                <p>Bắt đầu theo dõi deadline Moodle ngay hôm nay</p>
+                <div class="platform-buttons">
+                    <a href="UTE-Notice.apk" class="platform-btn android" download>
+                        <span class="platform-icon">🤖</span>
+                        <div class="platform-info">
+                            <span class="platform-name">Tải Android APK</span>
+                            <span class="platform-status">~8 MB • Android 7.0+</span>
+                        </div>
+                    </a>
+                    <div class="platform-btn ios">
+                        <span class="platform-icon">🍎</span>
+                        <div class="platform-info">
+                            <span class="platform-name">iOS Coming Soon</span>
+                            <span class="platform-status">Dự kiến Q2 2025</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sticky floating download button -->
+        <div class="sticky-download" id="stickyDownload">
+            <a href="UTE-Notice.apk" class="fab-btn" download>
+                <span>📥</span>
+                <span>Tải APK</span>
+            </a>
         </div>
 
         <div class="footer">
@@ -496,5 +777,38 @@
             </p>
         </div>
     </div>
+
+    <script>
+        // Sticky download button logic
+        const stickyDownload = document.getElementById('stickyDownload');
+        const header = document.querySelector('.header');
+        
+        function handleScroll() {
+            // Show sticky button when scrolled past header
+            const headerBottom = header.offsetTop + header.offsetHeight;
+            const scrolled = window.scrollY;
+            
+            if (scrolled > headerBottom + 100) {
+                stickyDownload.classList.add('visible');
+            } else {
+                stickyDownload.classList.remove('visible');
+            }
+        }
+        
+        // Throttle scroll event for performance
+        let ticking = false;
+        window.addEventListener('scroll', function() {
+            if (!ticking) {
+                window.requestAnimationFrame(function() {
+                    handleScroll();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+        
+        // Initial check
+        handleScroll();
+    </script>
 </body>
 </html>
