@@ -13,5 +13,12 @@ data class SyncResult(
     val ok: Boolean,
     val message: String,
     val totalEvents: Int = 0,
-    val newEvents: Int = 0
+    val newEvents: Int = 0,
+    val retryable: Boolean = false
+)
+
+data class PendingDeadlineNotification(
+    val key: String,
+    val type: String,
+    val event: DeadlineEvent
 )

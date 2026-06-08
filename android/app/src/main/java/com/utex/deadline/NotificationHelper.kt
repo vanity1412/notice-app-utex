@@ -12,15 +12,16 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.abs
 
 object NotificationHelper {
     private const val ALERT_CHANNEL_ID = "ute_deadline_alerts_v2"
     private const val SUMMARY_CHANNEL_ID = "ute_deadline_summary_v1"
+    private const val DAILY_SUMMARY_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1000L
     private val vibrationPattern = longArrayOf(0L, 280L, 160L, 280L)
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
         .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
@@ -60,8 +61,8 @@ object NotificationHelper {
         }
     }
 
-    fun notifyNewDeadline(context: Context, event: DeadlineEvent) {
-        show(
+    fun notifyNewDeadline(context: Context, event: DeadlineEvent): Boolean {
+        return show(
             context = context,
             title = "Lịch mới: ${EventLabels.kind(event)}",
             message = eventMessage(context, event),
@@ -71,8 +72,8 @@ object NotificationHelper {
         )
     }
 
-    fun notifyChangedDeadline(context: Context, event: DeadlineEvent) {
-        show(
+    fun notifyChangedDeadline(context: Context, event: DeadlineEvent): Boolean {
+        return show(
             context = context,
             title = "Thay đổi: ${EventLabels.kind(event)}",
             message = "Giáo viên đã cập nhật lịch này.\n${eventMessage(context, event)}",
@@ -82,8 +83,8 @@ object NotificationHelper {
         )
     }
 
-    fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String) {
-        show(
+    fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String): Boolean {
+        return show(
             context = context,
             title = "Cảnh báo: $leadText",
             message = eventMessage(context, event),
@@ -93,8 +94,8 @@ object NotificationHelper {
         )
     }
 
-    fun notifySummary(context: Context, count: Int) {
-        show(
+    fun notifySummary(context: Context, count: Int): Boolean {
+        return show(
             context = context,
             title = "UTE Notice đã sẵn sàng",
             message = "Đã tìm thấy $count deadline sắp tới. App sẽ nhắc khi có lịch mới hoặc gần tới hạn.",
@@ -102,8 +103,8 @@ object NotificationHelper {
         )
     }
 
-    fun notifyTest(context: Context) {
-        show(
+    fun notifyTest(context: Context): Boolean {
+        return show(
             context = context,
             title = "Test thông báo UTE Notice",
             message = "Nếu bạn thấy thông báo này thì quyền thông báo đang hoạt động.\nMốc nhắc đang bật: ${EventStore.reminderOffsetsText(context)} trước hạn.",
@@ -112,38 +113,68 @@ object NotificationHelper {
         )
     }
 
-    fun notifyDailySummary(context: Context, events: List<DeadlineEvent>) {
-        val upcoming = events
+    fun notifyDailySummary(context: Context, events: List<DeadlineEvent>): Boolean {
+        val now = System.currentTimeMillis()
+        val summaryEvents = events
             .filterNot { EventStore.isDone(context, it.id) }
-            .filter { it.startAtMillis >= System.currentTimeMillis() - 60_000L }
+            .filter { it.startAtMillis in now..(now + DAILY_SUMMARY_WINDOW_MILLIS) }
             .sortedBy { it.startAtMillis }
+
+        val upcoming = summaryEvents
             .take(3)
 
         if (upcoming.isEmpty()) {
-            show(
-                context = context,
-                title = "UTE Notice",
-                message = "Hôm nay chưa có deadline sắp tới trong lịch đã lưu.",
-                id = stableNotificationId("daily-summary-empty")
-            )
-            return
+            return false
         }
 
         val lines = upcoming.joinToString("\n") { event ->
             "- ${EventLabels.kind(event)}: ${event.title} - ${formatTime(event.startAtMillis)}"
         }
-        show(
+        return show(
             context = context,
-            title = "Nhắc lịch hôm nay",
-            message = "Có ${events.count { !EventStore.isDone(context, it.id) }} mục đang theo dõi.\n$lines",
+            title = "Nhắc lịch sắp tới",
+            message = "Có ${summaryEvents.size} mục sắp tới trong 3 ngày.\n$lines",
             id = stableNotificationId("daily-summary")
         )
     }
 
-    private fun show(context: Context, title: String, message: String, id: Int, targetUrl: String? = null, withSound: Boolean = false) {
+    fun flushPendingDeadlineNotifications(context: Context): Int {
         ensureChannel(context)
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            return
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled() || (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        )) {
+            return 0
+        }
+
+        val pending = EventStore.loadPendingDeadlineNotifications(context)
+        if (pending.isEmpty()) return 0
+
+        val remaining = mutableListOf<PendingDeadlineNotification>()
+        var sent = 0
+        pending.forEach { item ->
+            val shown = when (item.type) {
+                "new" -> notifyNewDeadline(context, item.event)
+                "changed" -> notifyChangedDeadline(context, item.event)
+                else -> true
+            }
+            if (shown) {
+                sent += 1
+            } else {
+                remaining += item
+            }
+        }
+        EventStore.savePendingDeadlineNotifications(context, remaining)
+        return sent
+    }
+
+    private fun show(context: Context, title: String, message: String, id: Int, targetUrl: String? = null, withSound: Boolean = false): Boolean {
+        ensureChannel(context)
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled() || (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        )) {
+            return false
         }
         val intent = targetUrl
             ?.takeIf { it.isNotBlank() }
@@ -172,7 +203,14 @@ object NotificationHelper {
             builder.setSilent(true)
         }
         
-        NotificationManagerCompat.from(context).notify(id, builder.build())
+        return try {
+            manager.notify(id, builder.build())
+            true
+        } catch (_: SecurityException) {
+            false
+        } catch (_: RuntimeException) {
+            false
+        }
     }
 
     fun formatTime(millis: Long): String = timeFormatter.format(Instant.ofEpochMilli(millis))
@@ -187,5 +225,12 @@ object NotificationHelper {
         return lines.joinToString("\n")
     }
 
-    private fun stableNotificationId(text: String): Int = abs(text.hashCode())
+    private fun stableNotificationId(text: String): Int {
+        val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+        val value = ((digest[0].toInt() and 0x7F) shl 24) or
+            ((digest[1].toInt() and 0xFF) shl 16) or
+            ((digest[2].toInt() and 0xFF) shl 8) or
+            (digest[3].toInt() and 0xFF)
+        return value.takeIf { it != 0 } ?: 1
+    }
 }

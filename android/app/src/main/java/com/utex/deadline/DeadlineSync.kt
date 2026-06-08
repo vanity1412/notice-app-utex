@@ -1,6 +1,7 @@
 package com.utex.deadline
 
 import android.content.Context
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -8,7 +9,15 @@ import java.net.URL
 import javax.net.ssl.SSLHandshakeException
 
 object DeadlineSync {
+    private val syncLock = Any()
+
     fun sync(context: Context, notifyNew: Boolean): SyncResult {
+        return synchronized(syncLock) {
+            syncLocked(context.applicationContext, notifyNew)
+        }
+    }
+
+    private fun syncLocked(context: Context, notifyNew: Boolean): SyncResult {
         val url = EventStore.getIcalUrl(context)
         val validation = MoodleUrlValidator.validate(url)
         if (!validation.ok) return SyncResult(false, validation.message)
@@ -47,16 +56,35 @@ object DeadlineSync {
             EventStore.saveKnownIds(context, knownIds + events.map { it.id })
             EventStore.setLastSync(context, System.currentTimeMillis())
 
-            EventStore.enableDailySummaryAfterSetup(context)
+            EventStore.prepareDailySummaryAfterSetup(context)
             ReminderScheduler.scheduleAll(context, events.filterNot { EventStore.isDone(context, it.id) })
             ReminderScheduler.scheduleDailySummary(context)
 
             if (notifyNew) {
+                NotificationHelper.flushPendingDeadlineNotifications(context)
                 if (firstSync && events.isNotEmpty()) {
                     NotificationHelper.notifySummary(context, events.size)
                 } else {
-                    newEvents.forEach { NotificationHelper.notifyNewDeadline(context, it) }
-                    changedEvents.forEach { NotificationHelper.notifyChangedDeadline(context, it) }
+                    val pendingNotifications = mutableListOf<PendingDeadlineNotification>()
+                    newEvents.forEach { event ->
+                        if (!NotificationHelper.notifyNewDeadline(context, event)) {
+                            pendingNotifications += PendingDeadlineNotification(
+                                key = "new-${event.id}",
+                                type = "new",
+                                event = event
+                            )
+                        }
+                    }
+                    changedEvents.forEach { event ->
+                        if (!NotificationHelper.notifyChangedDeadline(context, event)) {
+                            pendingNotifications += PendingDeadlineNotification(
+                                key = "changed-${event.id}",
+                                type = "changed",
+                                event = event
+                            )
+                        }
+                    }
+                    EventStore.upsertPendingDeadlineNotifications(context, pendingNotifications)
                 }
             }
 
@@ -77,13 +105,15 @@ object DeadlineSync {
                 newEvents = if (firstSync) 0 else totalChanges
             )
         } catch (e: FriendlySyncException) {
-            SyncResult(false, e.message ?: "Không đồng bộ được lịch Moodle.")
+            SyncResult(false, e.message ?: "Không đồng bộ được lịch Moodle.", retryable = e.retryable)
         } catch (_: UnknownHostException) {
-            SyncResult(false, "Không có mạng hoặc không truy cập được utexlms.hcmute.edu.vn.")
+            SyncResult(false, "Không có mạng hoặc không truy cập được utexlms.hcmute.edu.vn.", retryable = true)
         } catch (_: SocketTimeoutException) {
-            SyncResult(false, "Moodle phản hồi quá lâu. Hãy thử lại khi mạng ổn hơn.")
+            SyncResult(false, "Moodle phản hồi quá lâu. Hãy thử lại khi mạng ổn hơn.", retryable = true)
         } catch (_: SSLHandshakeException) {
             SyncResult(false, "Lỗi chứng chỉ khi kết nối Moodle. Hãy kiểm tra ngày giờ điện thoại hoặc thử mạng khác.")
+        } catch (e: IOException) {
+            SyncResult(false, "Không đồng bộ được lịch Moodle: ${e.message ?: e.javaClass.simpleName}", retryable = true)
         } catch (e: Exception) {
             SyncResult(false, "Không đồng bộ được lịch Moodle: ${e.message ?: e.javaClass.simpleName}")
         }
@@ -104,12 +134,12 @@ object DeadlineSync {
                 in 500..599 -> "Moodle đang lỗi máy chủ ($responseCode). Hãy thử lại sau."
                 else -> "Moodle trả lỗi HTTP $responseCode. Hãy kiểm tra lại Calendar URL."
             }
-            throw FriendlySyncException(message)
+            throw FriendlySyncException(message, responseCode in 500..599)
         }
         conn.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
             return reader.readText()
         }
     }
 
-    private class FriendlySyncException(message: String) : Exception(message)
+    private class FriendlySyncException(message: String, val retryable: Boolean) : Exception(message)
 }

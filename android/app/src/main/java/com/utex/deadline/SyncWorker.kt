@@ -18,8 +18,10 @@ class SyncWorker(appContext: Context, params: WorkerParameters) : Worker(appCont
                 ReminderScheduler.reschedulePeriodicSync(applicationContext)
             }
             Result.success()
-        } else {
+        } else if (result.retryable) {
             Result.retry()
+        } else {
+            Result.success()
         }
     }
 }

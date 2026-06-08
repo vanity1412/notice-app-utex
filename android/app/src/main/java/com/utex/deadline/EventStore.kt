@@ -21,6 +21,7 @@ object EventStore {
     private const val KEY_DAILY_SUMMARY_DAYS = "daily_summary_days"
     private const val KEY_DONE_IDS = "done_ids"
     private const val KEY_REMINDER_OFFSETS = "reminder_offsets"
+    private const val KEY_PENDING_NOTIFICATIONS = "pending_notifications_json"
     const val ALL_DAYS_MASK = 0b1111111
     private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L)
     private val ALLOWED_REMINDER_MINUTES = listOf(2L * 24L * 60L, 24L * 60L, 12L * 60L, 3L * 60L, 60L, 30L)
@@ -47,6 +48,7 @@ object EventStore {
             .remove(KEY_LAST_SYNC)
             .remove(KEY_DAILY_SUMMARY_TOUCHED)
             .remove(KEY_DONE_IDS)
+            .remove(KEY_PENDING_NOTIFICATIONS)
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
             .apply()
         cachedEvents = emptyList()
@@ -75,11 +77,10 @@ object EventStore {
             .apply()
     }
 
-    fun enableDailySummaryAfterSetup(context: Context) {
+    fun prepareDailySummaryAfterSetup(context: Context) {
         val preferences = prefs(context)
         if (preferences.getBoolean(KEY_DAILY_SUMMARY_TOUCHED, false)) return
         preferences.edit()
-            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
             .putInt(KEY_DAILY_SUMMARY_HOUR, getDailySummaryHour(context))
             .putInt(KEY_DAILY_SUMMARY_MINUTE, getDailySummaryMinute(context))
             .putInt(KEY_DAILY_SUMMARY_DAYS, getDailySummaryDaysMask(context))
@@ -175,6 +176,42 @@ object EventStore {
 
     fun resetKnownIds(context: Context) {
         prefs(context).edit().remove(KEY_KNOWN_IDS).apply()
+    }
+
+    fun loadPendingDeadlineNotifications(context: Context): List<PendingDeadlineNotification> {
+        val json = prefs(context).getString(KEY_PENDING_NOTIFICATIONS, "[]").orEmpty()
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).mapNotNull { i ->
+                val obj = arr.optJSONObject(i) ?: return@mapNotNull null
+                val type = obj.optString("type").takeIf { it == "new" || it == "changed" } ?: return@mapNotNull null
+                val event = obj.optJSONObject("event")?.let { pendingEventFromJson(it) } ?: return@mapNotNull null
+                val key = obj.optString("key").takeIf { it.isNotBlank() } ?: "$type-${event.id}"
+                PendingDeadlineNotification(key, type, event)
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun upsertPendingDeadlineNotifications(context: Context, notifications: List<PendingDeadlineNotification>) {
+        if (notifications.isEmpty()) return
+        val merged = LinkedHashMap<String, PendingDeadlineNotification>()
+        loadPendingDeadlineNotifications(context).forEach { merged[it.key] = it }
+        notifications.forEach { merged[it.key] = it }
+        savePendingDeadlineNotifications(context, merged.values.toList())
+    }
+
+    fun savePendingDeadlineNotifications(context: Context, notifications: List<PendingDeadlineNotification>) {
+        val arr = JSONArray()
+        notifications.distinctBy { it.key }.forEach { pending ->
+            arr.put(JSONObject().apply {
+                put("key", pending.key)
+                put("type", pending.type)
+                put("event", eventToJson(pending.event))
+            })
+        }
+        prefs(context).edit().putString(KEY_PENDING_NOTIFICATIONS, arr.toString()).apply()
     }
 
     fun getDoneIds(context: Context): Set<String> {
@@ -308,7 +345,8 @@ object EventStore {
             KEY_DAILY_SUMMARY_HOUR,
             KEY_DAILY_SUMMARY_MINUTE,
             KEY_DAILY_SUMMARY_DAYS,
-            KEY_REMINDER_OFFSETS
+            KEY_REMINDER_OFFSETS,
+            KEY_PENDING_NOTIFICATIONS
         ).forEach { key ->
             when (val value = legacyPrefs.all[key]) {
                 is String -> editor.putString(key, value)
@@ -336,6 +374,32 @@ object EventStore {
         }
     }
 
+    private fun eventToJson(event: DeadlineEvent): JSONObject {
+        return JSONObject().apply {
+            put("id", event.id)
+            put("title", event.title)
+            put("startAtMillis", event.startAtMillis)
+            put("sourceUrl", event.sourceUrl ?: "")
+            put("rawType", event.rawType ?: "")
+            put("description", event.description ?: "")
+        }
+    }
+
+    private fun pendingEventFromJson(obj: JSONObject): DeadlineEvent? {
+        val id = obj.optString("id").takeIf { it.isNotBlank() } ?: return null
+        val title = obj.optString("title").takeIf { it.isNotBlank() } ?: return null
+        val startAtMillis = obj.optLong("startAtMillis", 0L)
+        if (startAtMillis <= 0L) return null
+        return DeadlineEvent(
+            id = id,
+            title = title,
+            startAtMillis = startAtMillis,
+            sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() },
+            rawType = obj.optString("rawType").takeIf { it.isNotBlank() },
+            description = obj.optString("description").takeIf { it.isNotBlank() }
+        )
+    }
+
     private fun clearLegacyConnection(context: Context) {
         legacyPrefs(context).edit()
             .remove(KEY_ICAL_URL)
@@ -343,6 +407,7 @@ object EventStore {
             .remove(KEY_KNOWN_IDS)
             .remove(KEY_LAST_SYNC)
             .remove(KEY_DONE_IDS)
+            .remove(KEY_PENDING_NOTIFICATIONS)
             .apply()
     }
 }

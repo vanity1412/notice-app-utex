@@ -102,6 +102,16 @@ class MainActivity : Activity() {
         queueSyncIfStale()
         if (::notificationChip.isInitialized) updateNotificationChip()
         if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
+        NotificationHelper.flushPendingDeadlineNotifications(this)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            NotificationHelper.flushPendingDeadlineNotifications(this)
+        }
+        if (::notificationChip.isInitialized) updateNotificationChip()
+        if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
     }
 
     private fun buildUi() {
@@ -972,16 +982,16 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         doneRow.addView(TextView(this).apply {
-            text = if (hideDoneEvents) "Ẩn đã xong" else "Hiện đã xong"
+            text = if (hideDoneEvents) "Deadline đã xong đang ẩn" else "Đang hiện deadline đã xong"
             textSize = 11f
             setTextColor(muted)
         }, LinearLayout.LayoutParams(0, wrap(), 1f))
-        doneRow.addView(secondaryButton(if (hideDoneEvents) "Hiện" else "Ẩn").apply {
+        doneRow.addView(secondaryButton(if (hideDoneEvents) "Hiện đã xong" else "Ẩn đã xong").apply {
             setOnClickListener {
                 hideDoneEvents = !hideDoneEvents
                 showCalendarTab()
             }
-        }, LinearLayout.LayoutParams(dp(70), dp(34)))
+        }, LinearLayout.LayoutParams(dp(116), dp(34)))
         panel.addView(doneRow)
         return panel
     }
