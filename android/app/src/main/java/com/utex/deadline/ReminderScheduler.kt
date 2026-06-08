@@ -117,6 +117,7 @@ object ReminderScheduler {
                         .putString("rawType", event.rawType.orEmpty())
                         .putString("description", event.description.orEmpty())
                         .putString("leadText", offset.label)
+                        .putLong("leadMinutes", offset.minutes)
                         .build()
                     val request = OneTimeWorkRequestBuilder<ReminderWorker>()
                         .setInitialDelay(delay, TimeUnit.MILLISECONDS)

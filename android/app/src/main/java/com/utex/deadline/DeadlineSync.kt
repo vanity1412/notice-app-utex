@@ -61,30 +61,47 @@ object DeadlineSync {
             ReminderScheduler.scheduleDailySummary(context)
 
             if (notifyNew) {
-                NotificationHelper.flushPendingDeadlineNotifications(context)
                 if (firstSync && events.isNotEmpty()) {
                     NotificationHelper.notifySummary(context, events.size)
+                    // Flush pending notifications nếu có
+                    NotificationHelper.flushPendingDeadlineNotifications(context)
                 } else {
+                    val now = System.currentTimeMillis()
                     val pendingNotifications = mutableListOf<PendingDeadlineNotification>()
+                    
                     newEvents.forEach { event ->
-                        if (!NotificationHelper.notifyNewDeadline(context, event)) {
-                            pendingNotifications += PendingDeadlineNotification(
-                                key = "new-${event.id}",
-                                type = "new",
-                                event = event
-                            )
+                        // Atomic check-and-notify để tránh race condition
+                        synchronized(NotificationHelper) {
+                            if (!NotificationHelper.notifyNewDeadline(context, event)) {
+                                pendingNotifications += PendingDeadlineNotification(
+                                    key = "new-${event.id}",
+                                    type = "new",
+                                    event = event,
+                                    timestamp = now
+                                )
+                            }
                         }
                     }
+                    
                     changedEvents.forEach { event ->
-                        if (!NotificationHelper.notifyChangedDeadline(context, event)) {
-                            pendingNotifications += PendingDeadlineNotification(
-                                key = "changed-${event.id}",
-                                type = "changed",
-                                event = event
-                            )
+                        synchronized(NotificationHelper) {
+                            if (!NotificationHelper.notifyChangedDeadline(context, event)) {
+                                pendingNotifications += PendingDeadlineNotification(
+                                    key = "changed-${event.id}",
+                                    type = "changed",
+                                    event = event,
+                                    timestamp = now
+                                )
+                            }
                         }
                     }
-                    EventStore.upsertPendingDeadlineNotifications(context, pendingNotifications)
+                    
+                    if (pendingNotifications.isNotEmpty()) {
+                        EventStore.upsertPendingDeadlineNotifications(context, pendingNotifications)
+                    }
+                    
+                    // Flush pending notifications nếu quyền đã được cấp
+                    NotificationHelper.flushPendingDeadlineNotifications(context)
                 }
             }
 

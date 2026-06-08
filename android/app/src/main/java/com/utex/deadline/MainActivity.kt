@@ -623,14 +623,48 @@ class MainActivity : Activity() {
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
         })
         panel.addView(TextView(this).apply {
-            text = "Mặc định bật 1 ngày, 12 giờ và 1 giờ. Có thể thêm/bớt mốc, nhưng app luôn giữ ít nhất 1 mốc nhắc."
+            text = "Chọn mốc có sẵn hoặc thêm mốc tùy chỉnh. App luôn giữ ít nhất 1 mốc nhắc."
             textSize = 12f
             setTextColor(muted)
             setPadding(0, dp(4), 0, dp(6))
         })
-        panel.addView(reminderOffsetsRow(listOf(2L * 24L * 60L, 24L * 60L, 12L * 60L)))
-        addSpacer(panel, 6)
-        panel.addView(reminderOffsetsRow(listOf(3L * 60L, 60L, 30L)))
+        
+        // Render preset reminders
+        val presetOptions = EventStore.getReminderOffsetOptions()
+        var rowOptions = mutableListOf<Long>()
+        presetOptions.forEach { minutes ->
+            rowOptions.add(minutes)
+            if (rowOptions.size == 3) {
+                panel.addView(reminderOffsetsRow(rowOptions.toList()))
+                addSpacer(panel, 6)
+                rowOptions.clear()
+            }
+        }
+        if (rowOptions.isNotEmpty()) {
+            panel.addView(reminderOffsetsRow(rowOptions.toList()))
+            addSpacer(panel, 6)
+        }
+        
+        // Custom reminders
+        val customOffsets = EventStore.getCustomReminderOffsets(this)
+        if (customOffsets.isNotEmpty()) {
+            panel.addView(TextView(this).apply {
+                text = "Mốc tùy chỉnh"
+                textSize = 11f
+                setTextColor(muted)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+                setPadding(0, dp(4), 0, dp(4))
+            })
+            customOffsets.chunked(3).forEach { chunk ->
+                panel.addView(customReminderOffsetsRow(chunk))
+                addSpacer(panel, 6)
+            }
+        }
+        
+        // Add custom reminder button
+        panel.addView(secondaryButton("+ Thêm mốc tùy chỉnh").apply {
+            setOnClickListener { showAddCustomReminderDialog() }
+        }, LinearLayout.LayoutParams(match(), dp(42)))
 
         addSpacer(panel, 10)
         panel.addView(TextView(this).apply {
@@ -810,6 +844,222 @@ class MainActivity : Activity() {
                 showGuideTab()
             }
         }
+    }
+
+    private fun customReminderOffsetsRow(minutesOptions: List<Long>): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        minutesOptions.forEachIndexed { index, minutes ->
+            row.addView(customReminderOffsetButton(minutes), LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+                if (index > 0) marginStart = dp(6)
+            })
+        }
+        return row
+    }
+
+    private fun customReminderOffsetButton(minutes: Long): View {
+        val selected = EventStore.isReminderOffsetEnabled(this, minutes)
+        // Card bọc button + nút xóa
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = if (selected)
+                rounded(blue, 8)
+            else
+                rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
+        }
+        val label = TextView(this).apply {
+            text = EventStore.reminderOptionLabel(minutes)
+            textSize = 11f
+            setAllCaps(false)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setTextColor(if (selected) Color.WHITE else blue)
+            gravity = Gravity.CENTER
+            setPadding(dp(4), 0, 0, 0)
+        }
+        container.addView(label, LinearLayout.LayoutParams(0, dp(38), 1f))
+
+        // Nút xóa nhỏ "✕"
+        val removeBtn = TextView(this).apply {
+            text = "✕"
+            textSize = 11f
+            setTextColor(if (selected) Color.argb(180, 255, 255, 255) else Color.rgb(150, 100, 100))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, dp(6), 0)
+            setOnClickListener {
+                val enabledCount = EventStore.getReminderOffsetsMinutes(this@MainActivity).size
+                if (selected && enabledCount <= 1) {
+                    Toast.makeText(this@MainActivity, "Cần giữ ít nhất 1 mốc nhắc.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                showRemoveCustomReminderDialog(minutes)
+            }
+        }
+        container.addView(removeBtn, LinearLayout.LayoutParams(dp(24), dp(38)))
+
+        container.setOnClickListener {
+            val enabledCount = EventStore.getReminderOffsetsMinutes(this@MainActivity).size
+            if (selected && enabledCount <= 1) {
+                Toast.makeText(this, "Cần giữ ít nhất 1 mốc nhắc.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            EventStore.setReminderOffsetEnabled(this, minutes, !selected)
+            ReminderScheduler.scheduleAll(this, activeEventsForReminders())
+            showGuideTab()
+        }
+        return container
+    }
+
+    private fun showRemoveCustomReminderDialog(minutes: Long) {
+        val label = EventStore.reminderOptionLabel(minutes)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Xóa mốc tùy chỉnh")
+            .setMessage("Xóa mốc nhắc \"$label\" khỏi danh sách?")
+            .setPositiveButton("Xóa") { _, _ ->
+                EventStore.removeCustomReminderOffset(this, minutes)
+                ReminderScheduler.scheduleAll(this, activeEventsForReminders())
+                showGuideTab()
+            }
+            .setNegativeButton("Hủy", null)
+            .show()
+    }
+
+    private fun showAddCustomReminderDialog() {
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(8))
+        }
+
+        dialogLayout.addView(TextView(this).apply {
+            text = "Nhắc trước bao lâu?"
+            textSize = 13f
+            setTextColor(muted)
+            setPadding(0, 0, 0, dp(12))
+        })
+
+        // Hàng nhập số ngày
+        val daysRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val daysInput = EditText(this).apply {
+            hint = "0"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            textSize = 16f
+            setTextColor(ink)
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        daysRow.addView(daysInput, LinearLayout.LayoutParams(dp(72), dp(44)))
+        daysRow.addView(TextView(this).apply {
+            text = "ngày"
+            textSize = 14f
+            setTextColor(ink)
+            setPadding(dp(10), 0, dp(20), 0)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(wrap(), dp(44)))
+
+        // Hàng nhập số giờ
+        val hoursInput = EditText(this).apply {
+            hint = "0"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            textSize = 16f
+            setTextColor(ink)
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        daysRow.addView(hoursInput, LinearLayout.LayoutParams(dp(72), dp(44)))
+        daysRow.addView(TextView(this).apply {
+            text = "giờ"
+            textSize = 14f
+            setTextColor(ink)
+            setPadding(dp(10), 0, dp(20), 0)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(wrap(), dp(44)))
+
+        // Hàng nhập số phút
+        val minutesInput = EditText(this).apply {
+            hint = "0"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            textSize = 16f
+            setTextColor(ink)
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        daysRow.addView(minutesInput, LinearLayout.LayoutParams(dp(72), dp(44)))
+        daysRow.addView(TextView(this).apply {
+            text = "phút"
+            textSize = 14f
+            setTextColor(ink)
+            setPadding(dp(10), 0, 0, 0)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(wrap(), dp(44)))
+
+        dialogLayout.addView(daysRow)
+
+        // Preview label
+        val previewText = TextView(this).apply {
+            text = "Nhập số ngày/giờ/phút"
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(10), 0, 0)
+            gravity = Gravity.CENTER
+        }
+        dialogLayout.addView(previewText, LinearLayout.LayoutParams(match(), wrap()))
+
+        // Cập nhật preview realtime
+        val watcher = object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val d = daysInput.text.toString().toLongOrNull() ?: 0L
+                val h = hoursInput.text.toString().toLongOrNull() ?: 0L
+                val m = minutesInput.text.toString().toLongOrNull() ?: 0L
+                val total = d * 24L * 60L + h * 60L + m
+                previewText.text = if (total > 0)
+                    "→ Nhắc trước ${EventStore.reminderOptionLabel(total)}"
+                else
+                    "Nhập số ngày/giờ/phút"
+                previewText.setTextColor(if (total > 0) blueDark else muted)
+            }
+        }
+        daysInput.addTextChangedListener(watcher)
+        hoursInput.addTextChangedListener(watcher)
+        minutesInput.addTextChangedListener(watcher)
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Thêm mốc nhắc tùy chỉnh")
+            .setView(dialogLayout)
+            .setPositiveButton("Thêm") { _, _ ->
+                val d = daysInput.text.toString().toLongOrNull() ?: 0L
+                val h = hoursInput.text.toString().toLongOrNull() ?: 0L
+                val m = minutesInput.text.toString().toLongOrNull() ?: 0L
+                val total = d * 24L * 60L + h * 60L + m
+                when {
+                    total <= 0 -> Toast.makeText(this, "Hãy nhập ít nhất 1 phút.", Toast.LENGTH_SHORT).show()
+                    total > 30L * 24L * 60L -> Toast.makeText(this, "Mốc nhắc tối đa 30 ngày.", Toast.LENGTH_SHORT).show()
+                    EventStore.getAllReminderOffsetOptions(this).contains(total) -> {
+                        // Đã tồn tại → chỉ bật lên
+                        EventStore.setReminderOffsetEnabled(this, total, true)
+                        ReminderScheduler.scheduleAll(this, activeEventsForReminders())
+                        Toast.makeText(this, "Đã bật mốc ${EventStore.reminderOptionLabel(total)}.", Toast.LENGTH_SHORT).show()
+                        showGuideTab()
+                    }
+                    else -> {
+                        EventStore.addCustomReminderOffset(this, total)
+                        ReminderScheduler.scheduleAll(this, activeEventsForReminders())
+                        Toast.makeText(this, "Đã thêm mốc ${EventStore.reminderOptionLabel(total)}.", Toast.LENGTH_SHORT).show()
+                        showGuideTab()
+                    }
+                }
+            }
+            .setNegativeButton("Hủy", null)
+            .show()
     }
 
     private fun showDailyTimePicker() {

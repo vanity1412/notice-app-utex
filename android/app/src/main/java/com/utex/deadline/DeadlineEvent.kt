@@ -20,5 +20,6 @@ data class SyncResult(
 data class PendingDeadlineNotification(
     val key: String,
     val type: String,
-    val event: DeadlineEvent
+    val event: DeadlineEvent,
+    val timestamp: Long? = null
 )

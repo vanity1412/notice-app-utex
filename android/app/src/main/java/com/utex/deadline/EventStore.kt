@@ -21,10 +21,21 @@ object EventStore {
     private const val KEY_DAILY_SUMMARY_DAYS = "daily_summary_days"
     private const val KEY_DONE_IDS = "done_ids"
     private const val KEY_REMINDER_OFFSETS = "reminder_offsets"
+    private const val KEY_CUSTOM_REMINDER_OFFSETS = "custom_reminder_offsets"
     private const val KEY_PENDING_NOTIFICATIONS = "pending_notifications_json"
     const val ALL_DAYS_MASK = 0b1111111
     private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L)
-    private val ALLOWED_REMINDER_MINUTES = listOf(2L * 24L * 60L, 24L * 60L, 12L * 60L, 3L * 60L, 60L, 30L)
+    private val PRESET_REMINDER_MINUTES = listOf(
+        7L * 24L * 60L,      // 7 ngày
+        3L * 24L * 60L,      // 3 ngày  
+        2L * 24L * 60L,      // 2 ngày
+        24L * 60L,           // 1 ngày
+        12L * 60L,           // 12 giờ
+        6L * 60L,            // 6 giờ
+        3L * 60L,            // 3 giờ
+        60L,                 // 1 giờ
+        30L                  // 30 phút
+    )
     @Volatile
     private var cachedPrefs: SharedPreferences? = null
     @Volatile
@@ -184,10 +195,11 @@ object EventStore {
             val arr = JSONArray(json)
             (0 until arr.length()).mapNotNull { i ->
                 val obj = arr.optJSONObject(i) ?: return@mapNotNull null
-                val type = obj.optString("type").takeIf { it == "new" || it == "changed" } ?: return@mapNotNull null
+                val type = obj.optString("type").takeIf { it == "new" || it == "changed" || it == "daily-summary" } ?: return@mapNotNull null
                 val event = obj.optJSONObject("event")?.let { pendingEventFromJson(it) } ?: return@mapNotNull null
                 val key = obj.optString("key").takeIf { it.isNotBlank() } ?: "$type-${event.id}"
-                PendingDeadlineNotification(key, type, event)
+                val timestamp = obj.optLong("timestamp", 0L).takeIf { it > 0L }
+                PendingDeadlineNotification(key, type, event, timestamp)
             }
         } catch (_: Exception) {
             emptyList()
@@ -209,6 +221,7 @@ object EventStore {
                 put("key", pending.key)
                 put("type", pending.type)
                 put("event", eventToJson(pending.event))
+                pending.timestamp?.let { put("timestamp", it) }
             })
         }
         prefs(context).edit().putString(KEY_PENDING_NOTIFICATIONS, arr.toString()).apply()
@@ -237,18 +250,72 @@ object EventStore {
         cachedDoneIds = nextIds
     }
 
-    fun getReminderOffsetOptions(): List<Long> = ALLOWED_REMINDER_MINUTES
+    fun getReminderOffsetOptions(): List<Long> = PRESET_REMINDER_MINUTES
+
+    fun getCustomReminderOffsets(context: Context): List<Long> {
+        val json = prefs(context).getString(KEY_CUSTOM_REMINDER_OFFSETS, "[]").orEmpty()
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).mapNotNull { i ->
+                arr.optLong(i).takeIf { it > 0 }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun addCustomReminderOffset(context: Context, minutes: Long) {
+        if (minutes <= 0) return
+        val current = getCustomReminderOffsets(context).toMutableSet()
+        current += minutes
+        saveCustomReminderOffsets(context, current.toList())
+        
+        // Tự động enable custom reminder offset
+        val selected = getReminderOffsetsMinutes(context).toMutableSet()
+        selected += minutes
+        saveReminderOffsetsMinutes(context, selected.toList())
+    }
+
+    fun removeCustomReminderOffset(context: Context, minutes: Long) {
+        val current = getCustomReminderOffsets(context).toMutableSet()
+        current -= minutes
+        saveCustomReminderOffsets(context, current.toList())
+        
+        // Tự động disable nếu không còn trong custom list và không phải preset
+        if (minutes !in PRESET_REMINDER_MINUTES) {
+            val selected = getReminderOffsetsMinutes(context).toMutableSet()
+            selected -= minutes
+            if (selected.isEmpty()) selected += 60L // Đảm bảo ít nhất 1 mốc
+            saveReminderOffsetsMinutes(context, selected.toList())
+        }
+    }
+
+    private fun saveCustomReminderOffsets(context: Context, offsets: List<Long>) {
+        val arr = JSONArray()
+        offsets.sorted().forEach { arr.put(it) }
+        prefs(context).edit().putString(KEY_CUSTOM_REMINDER_OFFSETS, arr.toString()).apply()
+    }
+
+    fun getAllReminderOffsetOptions(context: Context): List<Long> {
+        return (PRESET_REMINDER_MINUTES + getCustomReminderOffsets(context)).distinct().sorted().reversed()
+    }
 
     fun getReminderOffsetsMinutes(context: Context): List<Long> {
         val saved = prefs(context).getString(KEY_REMINDER_OFFSETS, null)
         val parsed = saved
             ?.split(',')
             ?.mapNotNull { it.trim().toLongOrNull() }
-            ?.filter { it in ALLOWED_REMINDER_MINUTES }
+            ?.filter { it > 0 }
             ?.distinct()
             .orEmpty()
         val selected = parsed.ifEmpty { DEFAULT_REMINDER_MINUTES }
-        return ALLOWED_REMINDER_MINUTES.filter { it in selected }
+        val allOptions = getAllReminderOffsetOptions(context)
+        return allOptions.filter { it in selected }
+    }
+
+    private fun saveReminderOffsetsMinutes(context: Context, offsets: List<Long>) {
+        val saved = offsets.filter { it > 0 }.distinct().joinToString(",")
+        prefs(context).edit().putString(KEY_REMINDER_OFFSETS, saved).apply()
     }
 
     fun isReminderOffsetEnabled(context: Context, minutes: Long): Boolean {
@@ -256,7 +323,8 @@ object EventStore {
     }
 
     fun setReminderOffsetEnabled(context: Context, minutes: Long, enabled: Boolean) {
-        if (minutes !in ALLOWED_REMINDER_MINUTES) return
+        val allOptions = getAllReminderOffsetOptions(context)
+        if (minutes !in allOptions) return
         val selected = getReminderOffsetsMinutes(context).toMutableSet()
         if (enabled) {
             selected += minutes
@@ -264,21 +332,34 @@ object EventStore {
             selected -= minutes
         }
         val safeSelected = selected.ifEmpty { setOf(60L) }
-        val saved = ALLOWED_REMINDER_MINUTES
-            .filter { it in safeSelected }
-            .joinToString(",")
-        prefs(context).edit().putString(KEY_REMINDER_OFFSETS, saved).apply()
+        saveReminderOffsetsMinutes(context, safeSelected.toList())
     }
 
     fun reminderOptionLabel(minutes: Long): String {
         return when (minutes) {
+            7L * 24L * 60L -> "7 ngày"
+            3L * 24L * 60L -> "3 ngày"
             2L * 24L * 60L -> "2 ngày"
             24L * 60L -> "1 ngày"
             12L * 60L -> "12 giờ"
+            6L * 60L -> "6 giờ"
             3L * 60L -> "3 giờ"
             60L -> "1 giờ"
             30L -> "30 phút"
-            else -> "$minutes phút"
+            else -> {
+                // Format custom reminders
+                val days = minutes / (24L * 60L)
+                val hours = (minutes % (24L * 60L)) / 60L
+                val mins = minutes % 60L
+                when {
+                    days > 0 && hours == 0L && mins == 0L -> "$days ngày"
+                    days > 0 && hours > 0 && mins == 0L -> "$days ngày $hours giờ"
+                    days > 0 -> "$days ngày $hours giờ $mins phút"
+                    hours > 0 && mins == 0L -> "$hours giờ"
+                    hours > 0 -> "$hours giờ $mins phút"
+                    else -> "$mins phút"
+                }
+            }
         }
     }
 

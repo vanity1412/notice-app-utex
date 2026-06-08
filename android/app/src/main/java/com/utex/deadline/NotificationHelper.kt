@@ -62,6 +62,9 @@ object NotificationHelper {
     }
 
     fun notifyNewDeadline(context: Context, event: DeadlineEvent): Boolean {
+        if (EventStore.isDone(context, event.id)) {
+            return true // Không gửi thông báo cho deadline đã xong
+        }
         return show(
             context = context,
             title = "Lịch mới: ${EventLabels.kind(event)}",
@@ -73,6 +76,9 @@ object NotificationHelper {
     }
 
     fun notifyChangedDeadline(context: Context, event: DeadlineEvent): Boolean {
+        if (EventStore.isDone(context, event.id)) {
+            return true // Không gửi thông báo cho deadline đã xong
+        }
         return show(
             context = context,
             title = "Thay đổi: ${EventLabels.kind(event)}",
@@ -83,14 +89,16 @@ object NotificationHelper {
         )
     }
 
-    fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String): Boolean {
+    fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String, leadMinutes: Long = 60L): Boolean {
+        val priority = calculateReminderPriority(leadMinutes)
         return show(
             context = context,
             title = "Cảnh báo: $leadText",
             message = eventMessage(context, event),
             id = stableNotificationId("reminder-${event.id}-$leadText"),
             targetUrl = event.sourceUrl,
-            withSound = true
+            withSound = true,
+            priority = priority
         )
     }
 
@@ -134,7 +142,8 @@ object NotificationHelper {
             context = context,
             title = "Nhắc lịch sắp tới",
             message = "Có ${summaryEvents.size} mục sắp tới trong 3 ngày.\n$lines",
-            id = stableNotificationId("daily-summary")
+            id = stableNotificationId("daily-summary"),
+            timestamp = now
         )
     }
 
@@ -150,12 +159,34 @@ object NotificationHelper {
         val pending = EventStore.loadPendingDeadlineNotifications(context)
         if (pending.isEmpty()) return 0
 
+        val now = System.currentTimeMillis()
         val remaining = mutableListOf<PendingDeadlineNotification>()
         var sent = 0
+        
         pending.forEach { item ->
+            // Xóa pending notifications quá hạn (quá 3 ngày)
+            val age = now - (item.timestamp ?: 0L)
+            if (age > DAILY_SUMMARY_WINDOW_MILLIS) {
+                return@forEach // Bỏ qua notification này
+            }
+            
+            // Kiểm tra nếu deadline đã được đánh dấu done
+            if (EventStore.isDone(context, item.event.id)) {
+                return@forEach // Bỏ qua notification cho deadline đã xong
+            }
+            
             val shown = when (item.type) {
                 "new" -> notifyNewDeadline(context, item.event)
                 "changed" -> notifyChangedDeadline(context, item.event)
+                "daily-summary" -> {
+                    // Daily summary dùng timestamp để kiểm tra hết hạn
+                    val summaryAge = now - (item.timestamp ?: 0L)
+                    if (summaryAge <= DAILY_SUMMARY_WINDOW_MILLIS) {
+                        notifyDailySummary(context, EventStore.loadEvents(context))
+                    } else {
+                        true // Đã quá hạn, bỏ qua
+                    }
+                }
                 else -> true
             }
             if (shown) {
@@ -168,7 +199,16 @@ object NotificationHelper {
         return sent
     }
 
-    private fun show(context: Context, title: String, message: String, id: Int, targetUrl: String? = null, withSound: Boolean = false): Boolean {
+    private fun show(
+        context: Context, 
+        title: String, 
+        message: String, 
+        id: Int, 
+        targetUrl: String? = null, 
+        withSound: Boolean = false, 
+        timestamp: Long? = null,
+        priority: Int? = null
+    ): Boolean {
         ensureChannel(context)
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled() || (Build.VERSION.SDK_INT >= 33 &&
@@ -187,17 +227,19 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val channelId = if (withSound) ALERT_CHANNEL_ID else SUMMARY_CHANNEL_ID
+        val notificationPriority = priority ?: if (withSound) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW
+        
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_ute_notice)
             .setContentTitle(title)
             .setContentText(message.lineSequence().firstOrNull().orEmpty())
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(if (withSound) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
+            .setPriority(notificationPriority)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
         
         if (withSound) {
-            builder.setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+            builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
             builder.setVibrate(vibrationPattern)
         } else {
             builder.setSilent(true)
@@ -210,6 +252,17 @@ object NotificationHelper {
             false
         } catch (_: RuntimeException) {
             false
+        }
+    }
+
+    private fun calculateReminderPriority(leadMinutes: Long): Int {
+        return when {
+            leadMinutes <= 0 -> NotificationCompat.PRIORITY_MAX // Đã tới hạn hoặc quá hạn
+            leadMinutes <= 30 -> NotificationCompat.PRIORITY_MAX // 30 phút hoặc ít hơn
+            leadMinutes <= 60 -> NotificationCompat.PRIORITY_HIGH // 1 giờ
+            leadMinutes <= 3 * 60 -> NotificationCompat.PRIORITY_HIGH // 3 giờ
+            leadMinutes <= 12 * 60 -> NotificationCompat.PRIORITY_DEFAULT // 12 giờ
+            else -> NotificationCompat.PRIORITY_DEFAULT // 1 ngày trở lên
         }
     }
 
@@ -227,10 +280,13 @@ object NotificationHelper {
 
     private fun stableNotificationId(text: String): Int {
         val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+        // Sử dụng 4 bytes đầu tiên để giảm collision, nhưng vẫn giữ số dương
         val value = ((digest[0].toInt() and 0x7F) shl 24) or
             ((digest[1].toInt() and 0xFF) shl 16) or
             ((digest[2].toInt() and 0xFF) shl 8) or
             (digest[3].toInt() and 0xFF)
-        return value.takeIf { it != 0 } ?: 1
+        // Đảm bảo không trả về 0 và thêm checksum từ byte thứ 5 để giảm collision
+        val checksum = (digest[4].toInt() and 0xFF) + 1
+        return if (value != 0) value else checksum
     }
 }
