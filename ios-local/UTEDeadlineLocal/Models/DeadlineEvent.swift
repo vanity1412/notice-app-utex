@@ -29,35 +29,56 @@ struct PendingDeadlineNotification: Codable, Hashable {
     enum Kind: String, Codable {
         case new
         case changed
+        case reminder
+        case initialSummary = "initial-summary"
     }
 
     let key: String
     let kind: Kind
     let event: DeadlineEvent
     let timestamp: Date?
+    let summaryCount: Int?
+    let leadText: String?
+    let leadMinutes: Int?
 
-    init(key: String, kind: Kind, event: DeadlineEvent, timestamp: Date? = Date()) {
+    init(
+        key: String,
+        kind: Kind,
+        event: DeadlineEvent,
+        timestamp: Date? = Date(),
+        summaryCount: Int? = nil,
+        leadText: String? = nil,
+        leadMinutes: Int? = nil
+    ) {
         self.key = key
         self.kind = kind
         self.event = event
         self.timestamp = timestamp
+        self.summaryCount = summaryCount
+        self.leadText = leadText
+        self.leadMinutes = leadMinutes
     }
+}
+
+enum EventGroup {
+    case submission
+    case test
+    case exam
+    case deadline
+    case moodle
 }
 
 enum EventLabels {
     private static let locale = Locale(identifier: "vi_VN")
 
     static func kind(for event: DeadlineEvent) -> String {
-        let text = searchable("\(event.title) \(event.description ?? "")")
         let title = searchable(event.title)
-
-        if containsAny(text, ["nop", "bai nop", "assignment", "lab", "tieu luan", "project"]) {
+        switch group(for: event) {
+        case .submission:
             return "Bài nộp"
-        }
-        if containsAny(text, ["lich thi", "thi ", " exam", "exam ", "midterm", "final"]) {
+        case .exam:
             return "Thi"
-        }
-        if containsAny(text, ["online test", "quiz", "test", "kiem tra"]) {
+        case .test:
             if containsAny(title, ["bat dau", "mo bai", "open"]) {
                 return "Bắt đầu kiểm tra"
             }
@@ -65,16 +86,54 @@ enum EventLabels {
                 return "Hết giờ kiểm tra"
             }
             return "Kiểm tra"
+        case .deadline:
+            return "Deadline"
+        case .moodle:
+            return "Lịch Moodle"
+        }
+    }
+
+    static func group(for event: DeadlineEvent) -> EventGroup {
+        let text = searchable("\(event.title) \(event.description ?? "") \(event.rawType ?? "")")
+        if containsAny(text, ["nop", "bai nop", "assignment", "lab", "tieu luan", "project"]) {
+            return .submission
+        }
+        if containsAny(text, ["lich thi", "thi ", " exam", "exam ", "midterm", "final"]) {
+            return .exam
+        }
+        if containsAny(text, ["online test", "quiz", "test", "kiem tra"]) {
+            return .test
         }
         if containsAny(text, ["deadline", "due", "toi han", "den han", "han chot", "ket thuc"]) {
-            return "Deadline"
+            return .deadline
         }
-        return "Lịch Moodle"
+        return .moodle
+    }
+
+    static func broadGroup(for event: DeadlineEvent) -> EventGroup {
+        switch group(for: event) {
+        case .submission:
+            return .submission
+        case .test:
+            return .test
+        case .exam:
+            return .exam
+        default:
+            return .deadline
+        }
     }
 
     static func broadKind(for event: DeadlineEvent) -> String {
-        let value = kind(for: event)
-        return value.contains("kiểm tra") || value.contains("Kiểm tra") ? "Kiểm tra" : value
+        switch broadGroup(for: event) {
+        case .submission:
+            return "Bài nộp"
+        case .test:
+            return "Kiểm tra"
+        case .exam:
+            return "Thi"
+        default:
+            return "Deadline"
+        }
     }
 
     static func course(for event: DeadlineEvent) -> String? {

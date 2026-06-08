@@ -46,13 +46,14 @@ enum IcsParser {
         return rawEvents.compactMap { raw -> DeadlineEvent? in
             let title = raw["SUMMARY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !title.isEmpty else { return nil }
-            guard looksLikeDeadline(title: title, description: raw["DESCRIPTION"] ?? "", categories: raw["CATEGORIES"] ?? "") else {
+            guard looksLikeDeadline(title: title, description: raw["DESCRIPTION"] ?? "") else {
                 return nil
             }
 
+            let startTime = parseIcsDate(raw["DTSTART"], params: raw["DTSTART_PARAMS"])
             guard let time = parseIcsDate(raw["DUE"], params: raw["DUE_PARAMS"])
-                ?? parseIcsDate(raw["DTEND"], params: raw["DTEND_PARAMS"])
-                ?? parseIcsDate(raw["DTSTART"], params: raw["DTSTART_PARAMS"])
+                ?? parseIcsDate(raw["DTEND"], params: raw["DTEND_PARAMS"], allDayEndStart: raw["DTSTART"])
+                ?? startTime
             else {
                 return nil
             }
@@ -92,21 +93,27 @@ enum IcsParser {
         return result
     }
 
-    private static func parseIcsDate(_ value: String?, params: String?) -> Date? {
+    private static func parseIcsDate(_ value: String?, params: String?, allDayEndStart: String? = nil) -> Date? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
             return nil
         }
 
         if value.count == 8 || params?.range(of: "VALUE=DATE", options: .caseInsensitive) != nil {
-            guard let date = dateFormatter("yyyyMMdd", timeZone: localTimeZone).date(from: String(value.prefix(8))) else {
+            guard let parsedDate = dateFormatter("yyyyMMdd", timeZone: localTimeZone).date(from: String(value.prefix(8))) else {
                 return nil
             }
-            return localCalendar.date(bySettingHour: 23, minute: 59, second: 0, of: date)
+            let startDate = allDayEndStart
+                .flatMap { dateFormatter("yyyyMMdd", timeZone: localTimeZone).date(from: String($0.prefix(8))) }
+            var eventDate = parsedDate
+            if let startDate = startDate, parsedDate > startDate {
+                eventDate = localCalendar.date(byAdding: .day, value: -1, to: parsedDate) ?? parsedDate
+            }
+            return localCalendar.date(bySettingHour: 23, minute: 59, second: 0, of: eventDate)
         }
 
         if value.uppercased().hasSuffix("Z") {
             let utcTimeZone = TimeZone(secondsFromGMT: 0) ?? localTimeZone
-            return dateFormatter("yyyyMMdd'T'HHmmss'Z'", timeZone: utcTimeZone).date(from: value)
+            return dateFormatter("yyyyMMdd'T'HHmmss", timeZone: utcTimeZone).date(from: String(value.dropLast()))
         }
 
         let timeZone = timeZoneFromParams(params) ?? localTimeZone
@@ -121,7 +128,7 @@ enum IcsParser {
         guard let tzid = parts.first(where: { $0.uppercased().hasPrefix("TZID=") })?.dropFirst(5) else {
             return nil
         }
-        return TimeZone(identifier: String(tzid))
+        return TimeZone(identifier: String(tzid).trimmingCharacters(in: CharacterSet(charactersIn: "\"")))
     }
 
     private static func dateFormatter(_ format: String, timeZone: TimeZone) -> DateFormatter {
@@ -133,14 +140,15 @@ enum IcsParser {
         return formatter
     }
 
-    private static func looksLikeDeadline(title: String, description: String, categories: String) -> Bool {
-        let text = EventLabels.searchable("\(title) \(description) \(categories)")
+    private static func looksLikeDeadline(title: String, description: String) -> Bool {
+        let text = EventLabels.searchable("\(title) \(description)")
+        let paddedText = " \(text) "
         let keywords = [
             "toi han", "den han", "nop", "bai nop", "deadline", "due",
             "quiz", "test", "kiem tra", "ket thuc", "close", "closing",
-            "thi", "assignment", "lab", "tieu luan", "project"
+            "lich thi", "exam", "midterm", "final", "assignment", "lab", "tieu luan", "project"
         ]
-        return keywords.contains { text.contains($0) }
+        return keywords.contains { text.contains($0) } || paddedText.contains(" thi ")
     }
 
     private static func decodeIcsText(_ input: String) -> String {

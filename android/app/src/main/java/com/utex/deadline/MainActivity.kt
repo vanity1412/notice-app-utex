@@ -63,6 +63,7 @@ class MainActivity : Activity() {
     private var eventSearchText = ""
     private var selectedFilter = EventFilter.ALL
     private var hideDoneEvents = true
+    private var syncInProgress = false
 
     private val localZone = ZoneId.of("Asia/Ho_Chi_Minh")
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
@@ -94,12 +95,13 @@ class MainActivity : Activity() {
         requestNotificationPermissionIfNeeded()
         buildUi()
         ReminderScheduler.schedulePeriodicSync(this)
-        ReminderScheduler.scheduleDailySummary(this)
+        refreshScheduledNotifications()
     }
 
     override fun onResume() {
         super.onResume()
         queueSyncIfStale()
+        refreshScheduledNotifications()
         if (::notificationChip.isInitialized) updateNotificationChip()
         if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
         NotificationHelper.flushPendingDeadlineNotifications(this)
@@ -699,6 +701,11 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
         })
+        healthRow.addView(secondaryButton("Báo đúng giờ").apply {
+            setOnClickListener { openExactAlarmSettings() }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+            marginStart = dp(6)
+        })
         panel.addView(healthRow)
 
         val resetButton = outlineButton("Test lại thông báo deadline mới").apply {
@@ -714,37 +721,45 @@ class MainActivity : Activity() {
     }
 
     private fun sendTestNotification() {
-        val granted = Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (!granted) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
-            Toast.makeText(this, "Hãy cấp quyền thông báo rồi bấm Gửi test lại.", Toast.LENGTH_LONG).show()
+        if (!NotificationHelper.canPostNotifications(this)) {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+            }
+            Toast.makeText(this, "Hãy bật quyền thông báo rồi bấm Gửi test lại.", Toast.LENGTH_LONG).show()
             return
         }
-        NotificationHelper.notifyTest(this)
-        Toast.makeText(this, "Đã gửi thông báo test.", Toast.LENGTH_SHORT).show()
+        val sent = NotificationHelper.notifyTest(this)
+        Toast.makeText(
+            this,
+            if (sent) "Đã gửi thông báo test." else "Chưa gửi được thông báo test. Hãy kiểm tra cài đặt thông báo.",
+            Toast.LENGTH_SHORT
+        ).show()
         updateNotificationChip()
         refreshNotificationHealthText()
     }
 
     private fun refreshNotificationHealthText() {
         if (!::notificationHealthText.isInitialized) return
-        val notificationStatus = if (Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        ) {
-            "✓ Quyền thông báo: đã cấp"
+        val notificationStatus = if (NotificationHelper.canPostNotifications(this)) {
+            "✓ Thông báo: sẵn sàng"
         } else {
-            "✗ Quyền thông báo: chưa cấp"
+            "✗ Thông báo: chưa bật hoặc chưa cấp quyền"
         }
         val batteryStatus = if (isIgnoringBatteryOptimizations()) {
             "✓ Tối ưu pin: đã tắt (tốt)"
         } else {
             "⚠ Tối ưu pin: nên tắt để nhận thông báo đầy đủ"
         }
+        val exactAlarmStatus = if (ReminderScheduler.canScheduleExactAlarms(this)) {
+            "✓ Báo đúng giờ: đã cho phép exact alarm"
+        } else {
+            "⚠ Báo đúng giờ: cần cấp quyền để nhắc sát phút hơn"
+        }
         val syncStatus = EventStore.getLastSync(this).takeIf { it > 0L }?.let {
             "Sync gần nhất: ${timeFormatter.format(Instant.ofEpochMilli(it))}"
         } ?: "Chưa đồng bộ lần nào"
-        notificationHealthText.text = "$notificationStatus\n$batteryStatus\n$syncStatus\nMốc nhắc: ${EventStore.reminderOffsetsText(this)} trước hạn"
+        notificationHealthText.text = "$notificationStatus\n$batteryStatus\n$exactAlarmStatus\n$syncStatus\nMốc nhắc: ${EventStore.reminderOffsetsText(this)} trước hạn"
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
@@ -769,6 +784,32 @@ class MainActivity : Activity() {
                 })
             } catch (_: Exception) {
                 Toast.makeText(this, "Không mở được cài đặt pin trên máy này.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun openExactAlarmSettings() {
+        if (ReminderScheduler.canScheduleExactAlarms(this)) {
+            Toast.makeText(this, "Máy đã cho phép app báo đúng giờ.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            } else {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            }
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            } catch (_: Exception) {
+                Toast.makeText(this, "Không mở được cài đặt báo đúng giờ.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1295,10 +1336,16 @@ class MainActivity : Activity() {
     }
 
     private fun syncNow() {
+        if (syncInProgress) {
+            setStatus("Đang đồng bộ, vui lòng chờ trong giây lát...", StatusType.INFO)
+            return
+        }
+        syncInProgress = true
         setStatus("Đang đồng bộ lịch Moodle...", StatusType.INFO)
         thread {
             val result = DeadlineSync.sync(this, notifyNew = true)
             runOnUiThread {
+                syncInProgress = false
                 if (result.ok) {
                     ReminderScheduler.reschedulePeriodicSync(this)
                 }
@@ -1315,6 +1362,11 @@ class MainActivity : Activity() {
         if (lastSync == 0L || System.currentTimeMillis() - lastSync > staleMillis) {
             ReminderScheduler.scheduleImmediateSync(this)
         }
+    }
+
+    private fun refreshScheduledNotifications() {
+        ReminderScheduler.scheduleDailySummary(this)
+        ReminderScheduler.scheduleAll(this, activeEventsForReminders())
     }
 
     private fun toggleDone(event: DeadlineEvent) {
@@ -1369,9 +1421,9 @@ class MainActivity : Activity() {
             val doneOk = !hideDoneEvents || event.id !in doneIds
             val kindOk = when (selectedFilter) {
                 EventFilter.ALL -> true
-                EventFilter.SUBMISSION -> EventLabels.broadKind(event) == "Bài nộp"
-                EventFilter.TEST -> EventLabels.broadKind(event) == "Kiểm tra"
-                EventFilter.EXAM -> EventLabels.broadKind(event) == "Thi"
+                EventFilter.SUBMISSION -> EventLabels.broadGroup(event) == EventGroup.SUBMISSION
+                EventFilter.TEST -> EventLabels.broadGroup(event) == EventGroup.TEST
+                EventFilter.EXAM -> EventLabels.broadGroup(event) == EventGroup.EXAM
             }
             val searchOk = query.isBlank() || searchable(
                 "${event.title} ${event.rawType.orEmpty()} ${event.description.orEmpty()} ${EventLabels.kind(event)}"
@@ -1784,14 +1836,12 @@ class MainActivity : Activity() {
     }
 
     private fun updateNotificationChip() {
-        val granted = Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
+        if (NotificationHelper.canPostNotifications(this)) {
             notificationChip.text = "Thông báo sẵn sàng"
             notificationChip.setTextColor(Color.WHITE)
             notificationChip.background = rounded(Color.argb(45, 255, 255, 255), 8, Color.argb(90, 255, 255, 255), 1)
         } else {
-            notificationChip.text = "Chưa cấp quyền"
+            notificationChip.text = "Chưa bật thông báo"
             notificationChip.setTextColor(Color.WHITE)
             notificationChip.background = rounded(red, 8)
         }
@@ -1812,12 +1862,12 @@ class MainActivity : Activity() {
 
     private fun accentFor(event: DeadlineEvent): Int {
         val diff = event.startAtMillis - System.currentTimeMillis()
-        val kind = EventLabels.broadKind(event)
+        val group = EventLabels.broadGroup(event)
         return when {
             diff <= 24L * 60L * 60L * 1000L -> red
             diff <= 3L * 24L * 60L * 60L * 1000L -> amber
-            kind == "Bài nộp" -> green
-            kind == "Thi" -> red
+            group == EventGroup.SUBMISSION -> green
+            group == EventGroup.EXAM -> red
             else -> blue
         }
     }

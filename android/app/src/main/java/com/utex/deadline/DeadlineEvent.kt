@@ -21,5 +21,7 @@ data class PendingDeadlineNotification(
     val key: String,
     val type: String,
     val event: DeadlineEvent,
-    val timestamp: Long? = null
+    val timestamp: Long? = null,
+    val leadText: String? = null,
+    val leadMinutes: Long? = null
 )

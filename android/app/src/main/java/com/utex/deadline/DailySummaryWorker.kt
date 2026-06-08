@@ -8,19 +8,22 @@ class DailySummaryWorker(appContext: Context, params: WorkerParameters) : Worker
     override fun doWork(): Result {
         if (EventStore.isDailySummaryEnabled(applicationContext) && 
             EventStore.isDailySummaryAllowedToday(applicationContext)) {
-            val sent = NotificationHelper.notifyDailySummary(applicationContext, EventStore.loadEvents(applicationContext))
+            val events = EventStore.loadEvents(applicationContext)
+            val sent = NotificationHelper.notifyDailySummary(applicationContext, events)
             
             // Nếu không gửi được (chưa cấp quyền), lưu vào pending
-            if (!sent) {
+            if (!sent && !NotificationHelper.canPostNotifications(applicationContext) &&
+                NotificationHelper.hasUpcomingDailySummary(applicationContext, events)) {
+                val now = System.currentTimeMillis()
                 val pending = PendingDeadlineNotification(
-                    key = "daily-summary-${System.currentTimeMillis()}",
+                    key = "daily-summary-$now",
                     type = "daily-summary",
                     event = DeadlineEvent(
                         id = "daily-summary",
                         title = "Daily Summary",
-                        startAtMillis = System.currentTimeMillis()
+                        startAtMillis = now
                     ),
-                    timestamp = System.currentTimeMillis()
+                    timestamp = now
                 )
                 EventStore.upsertPendingDeadlineNotifications(applicationContext, listOf(pending))
             }

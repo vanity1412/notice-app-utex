@@ -107,10 +107,12 @@ final class NotificationService {
         var sent = 0
         let now = Date()
         for item in pending {
-            if let timestamp = item.timestamp, now.timeIntervalSince(timestamp) > pendingDeadlineLifetime {
+            if let timestamp = item.timestamp,
+               now.timeIntervalSince(timestamp) > pendingDeadlineLifetime,
+               !(item.kind == .reminder && item.event.startAt > now) {
                 continue
             }
-            if store.isDone(item.event.id) {
+            if [.new, .changed, .reminder].contains(item.kind), store.isDone(item.event.id) {
                 continue
             }
 
@@ -120,6 +122,25 @@ final class NotificationService {
                 shown = await notifyNewDeadline(item.event)
             case .changed:
                 shown = await notifyChangedDeadline(item.event)
+            case .reminder:
+                let minutes = item.leadMinutes ?? 60
+                let leadText = item.leadText ?? "\(store.reminderOptionLabel(minutes)) trước hạn"
+                let triggerDate = item.event.startAt.addingTimeInterval(TimeInterval(-minutes * 60))
+                if item.event.startAt <= now {
+                    shown = true
+                } else if triggerDate > now {
+                    shown = await scheduleReminderNotification(
+                        identifier: "reminder-\(stableIdentifier("\(item.event.id)-\(minutes)"))",
+                        event: item.event,
+                        leadText: leadText,
+                        triggerDate: triggerDate
+                    )
+                } else {
+                    shown = await notifyReminderNow(item.event, leadText: leadText, leadMinutes: minutes)
+                }
+            case .initialSummary:
+                let count = item.summaryCount ?? store.loadEvents().count
+                shown = count > 0 ? await notifyInitialSummary(count: count) : true
             }
             if shown {
                 sent += 1
@@ -140,8 +161,6 @@ final class NotificationService {
         let reminderIds = existing.map(\.identifier).filter { $0.hasPrefix("reminder-") }
         center.removePendingNotificationRequests(withIdentifiers: reminderIds)
 
-        guard await isAuthorized() else { return }
-
         let now = Date()
         let plans = events
             .filter { !store.isDone($0.id) }
@@ -149,11 +168,12 @@ final class NotificationService {
                 store.reminderOffsetsMinutes().compactMap { minutes -> ReminderPlan? in
                     let triggerDate = event.startAt.addingTimeInterval(TimeInterval(-minutes * 60))
                     let delay = triggerDate.timeIntervalSince(now)
-                    guard delay > 60, event.startAt > now else { return nil }
+                    guard delay > 0, event.startAt > now else { return nil }
                     return ReminderPlan(
                         identifier: "reminder-\(stableIdentifier("\(event.id)-\(minutes)"))",
                         event: event,
                         leadText: "\(store.reminderOptionLabel(minutes)) trước hạn",
+                        leadMinutes: minutes,
                         triggerDate: triggerDate
                     )
                 }
@@ -161,18 +181,28 @@ final class NotificationService {
             .sorted { $0.triggerDate < $1.triggerDate }
             .prefix(maxReminderNotifications)
 
-        for plan in plans {
-            let content = UNMutableNotificationContent()
-            content.title = "Cảnh báo: \(plan.leadText)"
-            content.body = eventMessage(plan.event)
-            content.sound = .default
-            if let url = plan.event.sourceURL {
-                content.userInfo = ["url": url]
+        guard await isAuthorized() else {
+            let reminderPending = plans.map { plan in
+                PendingDeadlineNotification(
+                    key: "reminder-\(plan.event.id)-\(plan.leadMinutes)",
+                    kind: .reminder,
+                    event: plan.event,
+                    leadText: plan.leadText,
+                    leadMinutes: plan.leadMinutes
+                )
             }
-            let delay = max(60, plan.triggerDate.timeIntervalSince(Date()))
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
-            let request = UNNotificationRequest(identifier: plan.identifier, content: content, trigger: trigger)
-            try? await center.add(request)
+            let retained = store.loadPendingNotifications().filter { $0.kind != .reminder }
+            store.savePendingNotifications(retained + reminderPending)
+            return
+        }
+
+        for plan in plans {
+            _ = await scheduleReminderNotification(
+                identifier: plan.identifier,
+                event: plan.event,
+                leadText: plan.leadText,
+                triggerDate: plan.triggerDate
+            )
         }
     }
 
@@ -217,6 +247,42 @@ final class NotificationService {
 
         do {
             try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func notifyReminderNow(_ event: DeadlineEvent, leadText: String, leadMinutes: Int) async -> Bool {
+        guard event.startAt > Date(), !store.isDone(event.id) else { return true }
+        return await showNow(
+            identifier: "reminder-now-\(stableIdentifier("\(event.id)-\(leadMinutes)-\(Date().timeIntervalSince1970)"))",
+            title: "Cảnh báo: \(leadText)",
+            body: eventMessage(event),
+            url: event.sourceURL,
+            withSound: true
+        )
+    }
+
+    private func scheduleReminderNotification(
+        identifier: String,
+        event: DeadlineEvent,
+        leadText: String,
+        triggerDate: Date
+    ) async -> Bool {
+        guard triggerDate > Date(), event.startAt > Date(), !store.isDone(event.id) else { return true }
+        let content = UNMutableNotificationContent()
+        content.title = "Cảnh báo: \(leadText)"
+        content.body = eventMessage(event)
+        content.sound = .default
+        if let url = event.sourceURL {
+            content.userInfo = ["url": url]
+        }
+        let delay = max(1, triggerDate.timeIntervalSince(Date()))
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        do {
+            try await center.add(request)
             return true
         } catch {
             return false
@@ -295,6 +361,7 @@ final class NotificationService {
         let identifier: String
         let event: DeadlineEvent
         let leadText: String
+        let leadMinutes: Int
         let triggerDate: Date
     }
 }

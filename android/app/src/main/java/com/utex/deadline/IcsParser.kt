@@ -48,11 +48,12 @@ object IcsParser {
         return events.mapNotNull { raw ->
             val title = raw["SUMMARY"]?.trim().orEmpty()
             if (title.isBlank()) return@mapNotNull null
-            if (!looksLikeDeadline(title, raw["DESCRIPTION"].orEmpty(), raw["CATEGORIES"].orEmpty())) return@mapNotNull null
+            if (!looksLikeDeadline(title, raw["DESCRIPTION"].orEmpty())) return@mapNotNull null
 
+            val startTime = parseIcsDate(raw["DTSTART"], raw["DTSTART_PARAMS"])
             val time = parseIcsDate(raw["DUE"], raw["DUE_PARAMS"])
-                ?: parseIcsDate(raw["DTEND"], raw["DTEND_PARAMS"])
-                ?: parseIcsDate(raw["DTSTART"], raw["DTSTART_PARAMS"])
+                ?: parseIcsDate(raw["DTEND"], raw["DTEND_PARAMS"], allDayEndStart = raw["DTSTART"])
+                ?: startTime
                 ?: return@mapNotNull null
 
             if (time < oneDayAgo) return@mapNotNull null
@@ -83,26 +84,38 @@ object IcsParser {
         return result
     }
 
-    private fun parseIcsDate(value: String?, params: String?): Long? {
+    private fun parseIcsDate(value: String?, params: String?, allDayEndStart: String? = null): Long? {
         val v = value?.trim().orEmpty()
         if (v.isBlank()) return null
         return try {
             when {
-                v.length == 8 || params?.contains("VALUE=DATE", ignoreCase = true) == true -> {
-                    LocalDate.parse(v.take(8), DateTimeFormatter.BASIC_ISO_DATE)
+                isDateOnly(v, params) -> {
+                    val parsedDate = LocalDate.parse(v.take(8), DateTimeFormatter.BASIC_ISO_DATE)
+                    val startDate = allDayEndStart
+                        ?.trim()
+                        ?.takeIf { it.length >= 8 }
+                        ?.let { start ->
+                            runCatching { LocalDate.parse(start.take(8), DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull()
+                        }
+                    val eventDate = if (startDate != null && parsedDate.isAfter(startDate)) {
+                        parsedDate.minusDays(1)
+                    } else {
+                        parsedDate
+                    }
+                    eventDate
                         .atTime(23, 59)
                         .atZone(localZone)
                         .toInstant()
                         .toEpochMilli()
                 }
                 v.endsWith("Z", ignoreCase = true) -> {
-                    LocalDateTime.parse(v.removeSuffix("Z"), dateTimeFormatter)
+                    LocalDateTime.parse(v.dropLast(1), dateTimeFormatter)
                         .toInstant(ZoneOffset.UTC)
                         .toEpochMilli()
                 }
                 else -> {
                     LocalDateTime.parse(v.take(15), dateTimeFormatter)
-                        .atZone(localZone)
+                        .atZone(zoneFromParams(params) ?: localZone)
                         .toInstant()
                         .toEpochMilli()
                 }
@@ -116,14 +129,30 @@ object IcsParser {
         }
     }
 
-    private fun looksLikeDeadline(title: String, description: String, categories: String): Boolean {
-        val text = searchable("$title $description $categories")
+    private fun isDateOnly(value: String, params: String?): Boolean {
+        return value.length == 8 || params?.contains("VALUE=DATE", ignoreCase = true) == true
+    }
+
+    private fun zoneFromParams(params: String?): ZoneId? {
+        return params
+            ?.split(';')
+            ?.firstOrNull { it.startsWith("TZID=", ignoreCase = true) }
+            ?.substringAfter('=')
+            ?.trim()
+            ?.trim('"')
+            ?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+    }
+
+    private fun looksLikeDeadline(title: String, description: String): Boolean {
+        val text = searchable("$title $description")
+        val paddedText = " $text "
         val keywords = listOf(
             "toi han", "den han", "nop", "bai nop", "deadline", "due",
             "quiz", "test", "kiem tra", "ket thuc", "close", "closing",
-            "thi", "assignment", "lab", "tieu luan", "project"
+            "lich thi", "exam", "midterm", "final", "assignment", "lab", "tieu luan", "project"
         )
-        return keywords.any { text.contains(it) }
+        return keywords.any { text.contains(it) } || paddedText.contains(" thi ")
     }
 
     private fun searchable(text: String): String {

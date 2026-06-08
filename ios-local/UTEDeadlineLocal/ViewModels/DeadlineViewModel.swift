@@ -87,11 +87,11 @@ final class DeadlineViewModel: ObservableObject {
             case .all:
                 kindOK = true
             case .submission:
-                kindOK = EventLabels.broadKind(for: event) == "Bài nộp"
+                kindOK = EventLabels.broadGroup(for: event) == .submission
             case .test:
-                kindOK = EventLabels.broadKind(for: event) == "Kiểm tra"
+                kindOK = EventLabels.broadGroup(for: event) == .test
             case .exam:
-                kindOK = EventLabels.broadKind(for: event) == "Thi"
+                kindOK = EventLabels.broadGroup(for: event) == .exam
             }
             let haystack = EventLabels.searchable("\(event.title) \(event.rawType ?? "") \(event.description ?? "") \(EventLabels.kind(for: event))")
             return doneOK && kindOK && (query.isEmpty || haystack.contains(query))

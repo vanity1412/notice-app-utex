@@ -132,8 +132,9 @@ final class EventStore {
             Keys.dailySummaryHour: 6,
             Keys.dailySummaryMinute: 0,
             Keys.dailySummaryDays: allDaysMask,
-            Keys.dailySummaryEnabled: false
+            Keys.dailySummaryEnabled: true
         ])
+        defaults.set(true, forKey: Keys.dailySummaryEnabled)
     }
 
     var isDailySummaryEnabled: Bool {
@@ -225,7 +226,8 @@ final class EventStore {
             .filter { allOptions.contains($0) }
             ?? []
         let selected = saved.isEmpty ? defaultReminderMinutes : saved
-        return allOptions.filter { selected.contains($0) }
+        let enabled = allOptions.filter { selected.contains($0) }
+        return enabled.isEmpty ? [60] : enabled
     }
 
     func setReminderOffset(_ minutes: Int, enabled: Bool) {

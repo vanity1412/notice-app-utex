@@ -116,10 +116,10 @@ struct EventRow: View {
         if diff <= 3 * 24 * 60 * 60 {
             return .orange
         }
-        if EventLabels.broadKind(for: event) == "Bài nộp" {
+        if EventLabels.broadGroup(for: event) == .submission {
             return .green
         }
-        if EventLabels.broadKind(for: event) == "Thi" {
+        if EventLabels.broadGroup(for: event) == .exam {
             return .red
         }
         return .blue

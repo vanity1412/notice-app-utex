@@ -23,6 +23,7 @@ object EventStore {
     private const val KEY_REMINDER_OFFSETS = "reminder_offsets"
     private const val KEY_CUSTOM_REMINDER_OFFSETS = "custom_reminder_offsets"
     private const val KEY_PENDING_NOTIFICATIONS = "pending_notifications_json"
+    private const val KEY_SCHEDULED_REMINDER_ALARMS = "scheduled_reminder_alarms"
     const val ALL_DAYS_MASK = 0b1111111
     private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L)
     private val PRESET_REMINDER_MINUTES = listOf(
@@ -60,6 +61,7 @@ object EventStore {
             .remove(KEY_DAILY_SUMMARY_TOUCHED)
             .remove(KEY_DONE_IDS)
             .remove(KEY_PENDING_NOTIFICATIONS)
+            .remove(KEY_SCHEDULED_REMINDER_ALARMS)
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
             .apply()
         cachedEvents = emptyList()
@@ -92,6 +94,7 @@ object EventStore {
         val preferences = prefs(context)
         if (preferences.getBoolean(KEY_DAILY_SUMMARY_TOUCHED, false)) return
         preferences.edit()
+            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
             .putInt(KEY_DAILY_SUMMARY_HOUR, getDailySummaryHour(context))
             .putInt(KEY_DAILY_SUMMARY_MINUTE, getDailySummaryMinute(context))
             .putInt(KEY_DAILY_SUMMARY_DAYS, getDailySummaryDaysMask(context))
@@ -195,11 +198,15 @@ object EventStore {
             val arr = JSONArray(json)
             (0 until arr.length()).mapNotNull { i ->
                 val obj = arr.optJSONObject(i) ?: return@mapNotNull null
-                val type = obj.optString("type").takeIf { it == "new" || it == "changed" || it == "daily-summary" } ?: return@mapNotNull null
+                val type = obj.optString("type").takeIf {
+                    it == "new" || it == "changed" || it == "reminder" || it == "daily-summary" || it == "initial-summary"
+                } ?: return@mapNotNull null
                 val event = obj.optJSONObject("event")?.let { pendingEventFromJson(it) } ?: return@mapNotNull null
                 val key = obj.optString("key").takeIf { it.isNotBlank() } ?: "$type-${event.id}"
                 val timestamp = obj.optLong("timestamp", 0L).takeIf { it > 0L }
-                PendingDeadlineNotification(key, type, event, timestamp)
+                val leadText = obj.optString("leadText").takeIf { it.isNotBlank() }
+                val leadMinutes = obj.optLong("leadMinutes", 0L).takeIf { it > 0L }
+                PendingDeadlineNotification(key, type, event, timestamp, leadText, leadMinutes)
             }
         } catch (_: Exception) {
             emptyList()
@@ -222,9 +229,23 @@ object EventStore {
                 put("type", pending.type)
                 put("event", eventToJson(pending.event))
                 pending.timestamp?.let { put("timestamp", it) }
+                pending.leadText?.let { put("leadText", it) }
+                pending.leadMinutes?.let { put("leadMinutes", it) }
             })
         }
         prefs(context).edit().putString(KEY_PENDING_NOTIFICATIONS, arr.toString()).apply()
+    }
+
+    fun getScheduledReminderAlarmKeys(context: Context): Set<String> {
+        return prefs(context).getStringSet(KEY_SCHEDULED_REMINDER_ALARMS, emptySet())?.toSet() ?: emptySet()
+    }
+
+    fun saveScheduledReminderAlarmKeys(context: Context, keys: Set<String>) {
+        prefs(context).edit().putStringSet(KEY_SCHEDULED_REMINDER_ALARMS, keys).apply()
+    }
+
+    fun clearScheduledReminderAlarmKeys(context: Context) {
+        prefs(context).edit().remove(KEY_SCHEDULED_REMINDER_ALARMS).apply()
     }
 
     fun getDoneIds(context: Context): Set<String> {
@@ -310,7 +331,7 @@ object EventStore {
             .orEmpty()
         val selected = parsed.ifEmpty { DEFAULT_REMINDER_MINUTES }
         val allOptions = getAllReminderOffsetOptions(context)
-        return allOptions.filter { it in selected }
+        return allOptions.filter { it in selected }.ifEmpty { listOf(60L) }
     }
 
     private fun saveReminderOffsetsMinutes(context: Context, offsets: List<Long>) {
@@ -427,7 +448,9 @@ object EventStore {
             KEY_DAILY_SUMMARY_MINUTE,
             KEY_DAILY_SUMMARY_DAYS,
             KEY_REMINDER_OFFSETS,
-            KEY_PENDING_NOTIFICATIONS
+            KEY_CUSTOM_REMINDER_OFFSETS,
+            KEY_PENDING_NOTIFICATIONS,
+            KEY_SCHEDULED_REMINDER_ALARMS
         ).forEach { key ->
             when (val value = legacyPrefs.all[key]) {
                 is String -> editor.putString(key, value)
@@ -488,7 +511,9 @@ object EventStore {
             .remove(KEY_KNOWN_IDS)
             .remove(KEY_LAST_SYNC)
             .remove(KEY_DONE_IDS)
+            .remove(KEY_CUSTOM_REMINDER_OFFSETS)
             .remove(KEY_PENDING_NOTIFICATIONS)
+            .remove(KEY_SCHEDULED_REMINDER_ALARMS)
             .apply()
     }
 }

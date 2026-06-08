@@ -3,41 +3,58 @@ package com.utex.deadline
 import java.text.Normalizer
 import java.util.Locale
 
+enum class EventGroup {
+    SUBMISSION,
+    TEST,
+    EXAM,
+    DEADLINE,
+    MOODLE
+}
+
 object EventLabels {
     private val viLocale = Locale.forLanguageTag("vi-VN")
 
     fun kind(event: DeadlineEvent): String {
-        val text = searchable("${event.title} ${event.description.orEmpty()}")
         val title = searchable(event.title)
-
-        if (containsAny(text, "nop", "bai nop", "assignment", "lab", "tieu luan", "project")) {
-            return "Bài nộp"
-        }
-
-        if (containsAny(text, "lich thi", "thi ", " exam", "exam ", "midterm", "final")) {
-            return "Thi"
-        }
-
-        if (containsAny(text, "online test", "quiz", "test", "kiem tra")) {
-            return when {
+        return when (group(event)) {
+            EventGroup.SUBMISSION -> "Bài nộp"
+            EventGroup.EXAM -> "Thi"
+            EventGroup.TEST -> when {
                 containsAny(title, "bat dau", "mo bai", "open") -> "Bắt đầu kiểm tra"
                 containsAny(title, "ket thuc", "het han", "close", "closing") -> "Hết giờ kiểm tra"
                 else -> "Kiểm tra"
             }
+            EventGroup.DEADLINE -> "Deadline"
+            EventGroup.MOODLE -> "Lịch Moodle"
         }
+    }
 
-        if (containsAny(text, "deadline", "due", "toi han", "den han", "han chot", "ket thuc")) {
-            return "Deadline"
+    fun group(event: DeadlineEvent): EventGroup {
+        val text = searchable("${event.title} ${event.description.orEmpty()} ${event.rawType.orEmpty()}")
+        return when {
+            containsAny(text, "nop", "bai nop", "assignment", "lab", "tieu luan", "project") -> EventGroup.SUBMISSION
+            containsAny(text, "lich thi", "thi ", " exam", "exam ", "midterm", "final") -> EventGroup.EXAM
+            containsAny(text, "online test", "quiz", "test", "kiem tra") -> EventGroup.TEST
+            containsAny(text, "deadline", "due", "toi han", "den han", "han chot", "ket thuc") -> EventGroup.DEADLINE
+            else -> EventGroup.MOODLE
         }
+    }
 
-        return "Lịch Moodle"
+    fun broadGroup(event: DeadlineEvent): EventGroup {
+        return when (group(event)) {
+            EventGroup.SUBMISSION -> EventGroup.SUBMISSION
+            EventGroup.TEST -> EventGroup.TEST
+            EventGroup.EXAM -> EventGroup.EXAM
+            else -> EventGroup.DEADLINE
+        }
     }
 
     fun broadKind(event: DeadlineEvent): String {
-        val kind = kind(event)
-        return when {
-            kind.contains("kiểm tra", ignoreCase = true) -> "Kiểm tra"
-            else -> kind
+        return when (broadGroup(event)) {
+            EventGroup.SUBMISSION -> "Bài nộp"
+            EventGroup.TEST -> "Kiểm tra"
+            EventGroup.EXAM -> "Thi"
+            else -> "Deadline"
         }
     }
 

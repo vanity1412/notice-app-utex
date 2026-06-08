@@ -10,6 +10,7 @@ import javax.net.ssl.SSLHandshakeException
 
 object DeadlineSync {
     private val syncLock = Any()
+    private const val NEW_EVENT_GRACE_MILLIS = 60L * 60L * 1000L
 
     fun sync(context: Context, notifyNew: Boolean): SyncResult {
         return synchronized(syncLock) {
@@ -38,7 +39,7 @@ object DeadlineSync {
             val now = System.currentTimeMillis()
             
             // Phát hiện deadline mới
-            val newEvents = events.filter { it.startAtMillis >= now - 60_000L && it.id !in knownIds }
+            val newEvents = events.filter { it.startAtMillis >= now - NEW_EVENT_GRACE_MILLIS && it.id !in knownIds }
             
             // Phát hiện deadline bị thay đổi (thời gian hoặc nội dung)
             val changedEvents = if (!firstSync) {
@@ -62,7 +63,20 @@ object DeadlineSync {
 
             if (notifyNew) {
                 if (firstSync && events.isNotEmpty()) {
-                    NotificationHelper.notifySummary(context, events.size)
+                    val now = System.currentTimeMillis()
+                    if (!NotificationHelper.notifySummary(context, events.size)) {
+                        EventStore.upsertPendingDeadlineNotifications(
+                            context,
+                            listOf(
+                                PendingDeadlineNotification(
+                                    key = "summary-first-sync",
+                                    type = "initial-summary",
+                                    event = events.first(),
+                                    timestamp = now
+                                )
+                            )
+                        )
+                    }
                     // Flush pending notifications nếu có
                     NotificationHelper.flushPendingDeadlineNotifications(context)
                 } else {

@@ -3,6 +3,7 @@ package com.utex.deadline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -50,6 +51,79 @@ class IcsParserTest {
 
         assertEquals(1, events.size)
         assertEquals("Nộp bài Project tới hạn", events.first().title)
+    }
+
+    @Test
+    fun treatsAllDayDtendAsExclusiveEndDate() {
+        val base = LocalDate.now(zone).plusYears(1).plusDays(5)
+        val ics = calendarOf(
+            listOf(
+                "BEGIN:VEVENT",
+                "UID:all-day-deadline@utexlms.hcmute.edu.vn",
+                "SUMMARY:Nộp bài all-day tới hạn",
+                "DTSTART;VALUE=DATE:${base.format(DateTimeFormatter.BASIC_ISO_DATE)}",
+                "DTEND;VALUE=DATE:${base.plusDays(1).format(DateTimeFormatter.BASIC_ISO_DATE)}",
+                "CATEGORIES:PROJECT101",
+                "END:VEVENT"
+            ).joinToString("\n")
+        )
+
+        val eventDate = Instant.ofEpochMilli(IcsParser.parse(ics).first().startAtMillis)
+            .atZone(zone)
+            .toLocalDate()
+
+        assertEquals(base, eventDate)
+    }
+
+    @Test
+    fun respectsTimezoneIdWhenDateTimeIsNotUtcSuffixed() {
+        val base = LocalDate.now(zone).plusYears(1).plusDays(6)
+        val ics = calendarOf(
+            listOf(
+                "BEGIN:VEVENT",
+                "UID:tz-deadline@utexlms.hcmute.edu.vn",
+                "SUMMARY:Nộp bài theo TZID tới hạn",
+                "DTSTART;TZID=UTC:${base.atTime(10, 0).format(formatter)}",
+                "CATEGORIES:PROJECT101",
+                "END:VEVENT"
+            ).joinToString("\n")
+        )
+
+        val localHour = Instant.ofEpochMilli(IcsParser.parse(ics).first().startAtMillis)
+            .atZone(zone)
+            .hour
+
+        assertEquals(17, localHour)
+    }
+
+    @Test
+    fun doesNotTreatVietnameseWordsContainingThiAsExam() {
+        val base = LocalDate.now(zone).plusYears(1).plusDays(7)
+        val ics = calendarOf(
+            event(
+                uid = "design-note@utexlms.hcmute.edu.vn",
+                summary = "Thiết kế giao diện",
+                dtStart = base.atTime(8, 0).format(formatter),
+                category = "NOTICE"
+            )
+        )
+
+        assertTrue(IcsParser.parse(ics).isEmpty())
+    }
+
+    @Test
+    fun doesNotUseCourseCategoryAsDeadlineSignal() {
+        val base = LocalDate.now(zone).plusYears(1).plusDays(8)
+        val ics = calendarOf(
+            event(
+                uid = "project-course-note@utexlms.hcmute.edu.vn",
+                summary = "Sinh hoạt lớp",
+                dtStart = base.atTime(8, 0).format(formatter),
+                category = "PROJECT101"
+            )
+        )
+
+        assertTrue(IcsParser.parse(ics).isEmpty())
     }
 
     private fun calendarOf(vararg events: String): String {

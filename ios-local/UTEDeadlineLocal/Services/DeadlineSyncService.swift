@@ -5,6 +5,7 @@ actor DeadlineSyncService {
 
     private let store = EventStore.shared
     private let notifier = NotificationService.shared
+    private let newEventGraceInterval: TimeInterval = 60 * 60
 
     func sync(notifyNew: Bool) async -> SyncResult {
         let urlText = store.iCalURL
@@ -29,7 +30,7 @@ actor DeadlineSyncService {
             let now = Date()
             let previousMap = Dictionary(uniqueKeysWithValues: previousEvents.map { ($0.id, $0) })
 
-            let newEvents = events.filter { $0.startAt >= now.addingTimeInterval(-60) && !knownIds.contains($0.id) }
+            let newEvents = events.filter { $0.startAt >= now.addingTimeInterval(-newEventGraceInterval) && !knownIds.contains($0.id) }
             let changedEvents: [DeadlineEvent] = firstSync ? [] : events.filter { event in
                 guard knownIds.contains(event.id), let old = previousMap[event.id] else { return false }
                 return old.startAtMillis != event.startAtMillis ||
@@ -50,7 +51,16 @@ actor DeadlineSyncService {
             if notifyNew {
                 await notifier.flushPendingDeadlineNotifications()
                 if firstSync, !events.isEmpty {
-                    await notifier.notifyInitialSummary(count: events.count)
+                    if !(await notifier.notifyInitialSummary(count: events.count)) {
+                        store.upsertPendingNotifications([
+                            PendingDeadlineNotification(
+                                key: "summary-first-sync",
+                                kind: .initialSummary,
+                                event: events[0],
+                                summaryCount: events.count
+                            )
+                        ])
+                    }
                 } else {
                     var pending: [PendingDeadlineNotification] = []
                     for event in newEvents {

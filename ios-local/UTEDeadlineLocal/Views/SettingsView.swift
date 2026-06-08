@@ -262,6 +262,9 @@ struct SettingsView: View {
             Text("App luôn giữ ít nhất một mốc nhắc. Các notification đã lên lịch sẽ được tạo lại khi đổi mốc.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("iOS ưu tiên lên lịch tối đa 55 mốc nhắc gần nhất; các mốc xa hơn sẽ được tạo lại khi app sync hoặc bạn mở app.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .settingsCard()
     }

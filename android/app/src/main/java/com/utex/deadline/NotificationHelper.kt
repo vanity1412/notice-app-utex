@@ -121,12 +121,21 @@ object NotificationHelper {
         )
     }
 
+    fun canPostNotifications(context: Context): Boolean {
+        ensureChannel(context)
+        val manager = NotificationManagerCompat.from(context)
+        return manager.areNotificationsEnabled() && (Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    fun hasUpcomingDailySummary(context: Context, events: List<DeadlineEvent>): Boolean {
+        return dailySummaryEvents(context, events).isNotEmpty()
+    }
+
     fun notifyDailySummary(context: Context, events: List<DeadlineEvent>): Boolean {
         val now = System.currentTimeMillis()
-        val summaryEvents = events
-            .filterNot { EventStore.isDone(context, it.id) }
-            .filter { it.startAtMillis in now..(now + DAILY_SUMMARY_WINDOW_MILLIS) }
-            .sortedBy { it.startAtMillis }
+        val summaryEvents = dailySummaryEvents(context, events, now)
 
         val upcoming = summaryEvents
             .take(3)
@@ -148,11 +157,7 @@ object NotificationHelper {
     }
 
     fun flushPendingDeadlineNotifications(context: Context): Int {
-        ensureChannel(context)
-        val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled() || (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        )) {
+        if (!canPostNotifications(context)) {
             return 0
         }
 
@@ -166,23 +171,38 @@ object NotificationHelper {
         pending.forEach { item ->
             // Xóa pending notifications quá hạn (quá 3 ngày)
             val age = now - (item.timestamp ?: 0L)
-            if (age > DAILY_SUMMARY_WINDOW_MILLIS) {
+            if (age > DAILY_SUMMARY_WINDOW_MILLIS && !(item.type == "reminder" && item.event.startAtMillis > now)) {
                 return@forEach // Bỏ qua notification này
             }
             
             // Kiểm tra nếu deadline đã được đánh dấu done
-            if (EventStore.isDone(context, item.event.id)) {
+            if (item.type in listOf("new", "changed", "reminder") && EventStore.isDone(context, item.event.id)) {
                 return@forEach // Bỏ qua notification cho deadline đã xong
             }
             
             val shown = when (item.type) {
                 "new" -> notifyNewDeadline(context, item.event)
                 "changed" -> notifyChangedDeadline(context, item.event)
+                "reminder" -> {
+                    if (item.event.startAtMillis <= now) {
+                        true
+                    } else {
+                        val leadMinutes = item.leadMinutes
+                            ?: ((item.event.startAtMillis - now) / 60_000L).coerceAtLeast(1L)
+                        val leadText = item.leadText ?: EventStore.reminderLeadLabel(leadMinutes)
+                        notifyReminder(context, item.event, leadText, leadMinutes)
+                    }
+                }
+                "initial-summary" -> {
+                    val count = EventStore.loadEvents(context).size
+                    if (count > 0) notifySummary(context, count) else true
+                }
                 "daily-summary" -> {
                     // Daily summary dùng timestamp để kiểm tra hết hạn
                     val summaryAge = now - (item.timestamp ?: 0L)
-                    if (summaryAge <= DAILY_SUMMARY_WINDOW_MILLIS) {
-                        notifyDailySummary(context, EventStore.loadEvents(context))
+                    val events = EventStore.loadEvents(context)
+                    if (summaryAge <= DAILY_SUMMARY_WINDOW_MILLIS && hasUpcomingDailySummary(context, events)) {
+                        notifyDailySummary(context, events)
                     } else {
                         true // Đã quá hạn, bỏ qua
                     }
@@ -209,13 +229,10 @@ object NotificationHelper {
         timestamp: Long? = null,
         priority: Int? = null
     ): Boolean {
-        ensureChannel(context)
-        val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled() || (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        )) {
+        if (!canPostNotifications(context)) {
             return false
         }
+        val manager = NotificationManagerCompat.from(context)
         val intent = targetUrl
             ?.takeIf { it.isNotBlank() }
             ?.let { Intent(Intent.ACTION_VIEW, Uri.parse(it)) }
@@ -276,6 +293,17 @@ object NotificationHelper {
         lines += "${EventLabels.timeLabel(event)}: ${formatTime(event.startAtMillis)}"
         lines += "Mốc nhắc đang bật: ${EventStore.reminderOffsetsText(context)} trước hạn."
         return lines.joinToString("\n")
+    }
+
+    private fun dailySummaryEvents(
+        context: Context,
+        events: List<DeadlineEvent>,
+        now: Long = System.currentTimeMillis()
+    ): List<DeadlineEvent> {
+        return events
+            .filterNot { EventStore.isDone(context, it.id) }
+            .filter { it.startAtMillis in now..(now + DAILY_SUMMARY_WINDOW_MILLIS) }
+            .sortedBy { it.startAtMillis }
     }
 
     private fun stableNotificationId(text: String): Int {
