@@ -1172,7 +1172,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
             setPadding(dp(10), dp(8), dp(10), dp(8))
-            selectAllOnFocus = true
+            setSelectAllOnFocus(true)
         }
     }
 
