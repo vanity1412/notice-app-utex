@@ -330,7 +330,7 @@ object EventStore {
         val parsed = saved
             ?.split(',')
             ?.mapNotNull { it.trim().toLongOrNull() }
-            ?.filter { it > 0 }
+            ?.filter { it >= 0 }
             ?.distinct()
             .orEmpty()
         val selected = parsed.ifEmpty { DEFAULT_REMINDER_MINUTES }
@@ -339,7 +339,7 @@ object EventStore {
     }
 
     private fun saveReminderOffsetsMinutes(context: Context, offsets: List<Long>) {
-        val saved = offsets.filter { it > 0 }.distinct().joinToString(",")
+        val saved = offsets.filter { it >= 0 }.distinct().joinToString(",")
         prefs(context).edit().putString(KEY_REMINDER_OFFSETS, saved).apply()
     }
 
@@ -427,33 +427,31 @@ object EventStore {
         return synchronized(this) {
             cachedPrefs ?: run {
                 val appContext = context.applicationContext
-                val securePrefs = securePrefs(appContext)
-                val preferences = if (securePrefs != null) {
-                    migrateLegacyPrefs(appContext, securePrefs)
-                    securePrefs
-                } else {
-                    legacyPrefs(appContext)
-                }
-                cachedPrefs = preferences
-                preferences
+                val encryptedPrefs = encryptedPrefsOrThrow(appContext)
+                migrateLegacyPrefs(appContext, encryptedPrefs)
+                cachedPrefs = encryptedPrefs
+                encryptedPrefs
             }
         }
     }
 
-    private fun securePrefs(context: Context): SharedPreferences? {
-        return try {
+    private fun encryptedPrefsOrThrow(context: Context): SharedPreferences {
+        try {
             val masterKey = MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
-            EncryptedSharedPreferences.create(
+            return EncryptedSharedPreferences.create(
                 context,
                 PREFS,
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
-        } catch (_: Exception) {
-            null
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Không thể mở bộ nhớ mã hóa. Không lưu Moodle token bằng SharedPreferences thường.",
+                e
+            )
         }
     }
 

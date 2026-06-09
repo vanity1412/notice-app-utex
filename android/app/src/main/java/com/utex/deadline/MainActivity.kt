@@ -56,6 +56,7 @@ class MainActivity : Activity() {
     private lateinit var tabContent: LinearLayout
     private lateinit var calendarTab: TextView
     private lateinit var guideTab: TextView
+    private lateinit var notificationSettingsTab: TextView
     private var activeTab = ScreenTab.CALENDAR
     private var connectionExpanded = false
     private var eventViewMode = EventViewMode.LIST
@@ -166,8 +167,16 @@ class MainActivity : Activity() {
                 if (activeTab != ScreenTab.GUIDE) showGuideTab()
             }
         }
-        row.addView(calendarTab, LinearLayout.LayoutParams(0, dp(42), 1f))
-        row.addView(guideTab, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+        notificationSettingsTab = tabButton("Cài đặt\nthông báo").apply {
+            setOnClickListener {
+                if (activeTab != ScreenTab.NOTIFICATION_SETTINGS) showNotificationSettingsTab()
+            }
+        }
+        row.addView(calendarTab, LinearLayout.LayoutParams(0, dp(46), 1f))
+        row.addView(guideTab, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+            marginStart = dp(4)
+        })
+        row.addView(notificationSettingsTab, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
             marginStart = dp(4)
         })
         return row
@@ -176,10 +185,12 @@ class MainActivity : Activity() {
     private fun tabButton(text: String): TextView {
         return TextView(this).apply {
             this.text = text
-            textSize = 13f
+            textSize = 12f
             gravity = Gravity.CENTER
+            maxLines = 2
+            setLineSpacing(0f, 0.95f)
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-            setPadding(dp(10), 0, dp(10), 0)
+            setPadding(dp(6), 0, dp(6), 0)
         }
     }
 
@@ -222,7 +233,14 @@ class MainActivity : Activity() {
         tabContent.removeAllViews()
 
         tabContent.addView(quickGuidePanel())
-        addSpacer(tabContent, 8)
+        addSpacer(tabContent, 16)
+    }
+
+    private fun showNotificationSettingsTab() {
+        activeTab = ScreenTab.NOTIFICATION_SETTINGS
+        updateTabButtons()
+        tabContent.removeAllViews()
+
         tabContent.addView(notificationSettingsPanel())
         addSpacer(tabContent, 8)
         tabContent.addView(emailNotificationPanel())
@@ -233,13 +251,17 @@ class MainActivity : Activity() {
     }
 
     private fun updateTabButtons() {
-        if (!::calendarTab.isInitialized || !::guideTab.isInitialized) return
-        val selectedBackground = rounded(card, 8, line, 1)
-        val idleBackground = rounded(Color.TRANSPARENT, 8)
-        calendarTab.background = if (activeTab == ScreenTab.CALENDAR) selectedBackground else idleBackground
-        guideTab.background = if (activeTab == ScreenTab.GUIDE) selectedBackground else idleBackground
-        calendarTab.setTextColor(if (activeTab == ScreenTab.CALENDAR) blueDark else muted)
-        guideTab.setTextColor(if (activeTab == ScreenTab.GUIDE) blueDark else muted)
+        if (!::calendarTab.isInitialized || !::guideTab.isInitialized || !::notificationSettingsTab.isInitialized) return
+        val tabs = listOf(
+            calendarTab to ScreenTab.CALENDAR,
+            guideTab to ScreenTab.GUIDE,
+            notificationSettingsTab to ScreenTab.NOTIFICATION_SETTINGS
+        )
+        tabs.forEach { (tab, screenTab) ->
+            val selected = activeTab == screenTab
+            tab.background = if (selected) rounded(card, 8, line, 1) else rounded(Color.TRANSPARENT, 8)
+            tab.setTextColor(if (selected) blueDark else muted)
+        }
     }
 
     private fun headerView(): View {
@@ -581,7 +603,7 @@ class MainActivity : Activity() {
             setOnClickListener {
                 EventStore.setDailySummaryDaysMask(this@MainActivity, EventStore.ALL_DAYS_MASK)
                 ReminderScheduler.scheduleDailySummary(this@MainActivity)
-                showGuideTab()
+                showNotificationSettingsTab()
             }
         }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
@@ -590,7 +612,7 @@ class MainActivity : Activity() {
             setOnClickListener {
                 EventStore.setDailySummaryEnabled(this@MainActivity, false)
                 ReminderScheduler.scheduleDailySummary(this@MainActivity)
-                showGuideTab()
+                showNotificationSettingsTab()
             }
         }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
@@ -659,7 +681,7 @@ class MainActivity : Activity() {
                 setTypeface(Typeface.DEFAULT, Typeface.BOLD)
                 setPadding(0, dp(4), 0, dp(4))
             })
-            customOffsets.chunked(3).forEach { chunk ->
+            customOffsets.chunked(2).forEach { chunk ->
                 panel.addView(customReminderOffsetsRow(chunk))
                 addSpacer(panel, 6)
             }
@@ -691,29 +713,34 @@ class MainActivity : Activity() {
         }
         panel.addView(notificationHealthText)
 
-        val healthRow = LinearLayout(this).apply {
+        panel.addView(primaryButton("Gửi test").apply {
+            setOnClickListener { sendTestNotification() }
+        }, LinearLayout.LayoutParams(match(), dp(42)))
+
+        val healthSettingsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        healthRow.addView(primaryButton("Gửi test").apply {
-            setOnClickListener { sendTestNotification() }
-        }, LinearLayout.LayoutParams(0, dp(42), 1f))
-        healthRow.addView(secondaryButton("Cài đặt pin").apply {
+        healthSettingsRow.addView(secondaryButton("Cài đặt pin").apply {
             setOnClickListener { openBatteryOptimizationSettings() }
-        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-            marginStart = dp(6)
-        })
-        healthRow.addView(secondaryButton("Báo đúng giờ").apply {
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        healthSettingsRow.addView(secondaryButton("Báo đúng giờ").apply {
             setOnClickListener { openExactAlarmSettings() }
         }, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
             marginStart = dp(6)
         })
-        panel.addView(healthRow)
+        panel.addView(healthSettingsRow, LinearLayout.LayoutParams(match(), wrap()).apply {
+            topMargin = dp(6)
+        })
 
         val resetButton = outlineButton("Test lại thông báo deadline mới").apply {
             setOnClickListener {
                 EventStore.resetKnownIds(this@MainActivity)
-                setStatus("Đã reset danh sách đã biết. Qua tab Lịch bấm Kiểm tra để test thông báo mới.", StatusType.SUCCESS)
+                Toast.makeText(
+                    this@MainActivity,
+                    "Đã reset danh sách đã biết. Qua tab Lịch bấm Kiểm tra để test thông báo mới.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
         panel.addView(resetButton, LinearLayout.LayoutParams(match(), dp(42)).apply {
@@ -785,7 +812,7 @@ class MainActivity : Activity() {
                 }
                 EventStore.setUserEmail(this@MainActivity, email)
                 Toast.makeText(this@MainActivity, "Đã lưu email.", Toast.LENGTH_SHORT).show()
-                showGuideTab()
+                showNotificationSettingsTab()
             }
         }, LinearLayout.LayoutParams(0, dp(42), 1f))
         
@@ -794,7 +821,7 @@ class MainActivity : Activity() {
                 setOnClickListener {
                     EventStore.setEmailNotificationEnabled(this@MainActivity, false)
                     Toast.makeText(this@MainActivity, "Đã tắt thông báo email.", Toast.LENGTH_SHORT).show()
-                    showGuideTab()
+                    showNotificationSettingsTab()
                 }
             }
         } else {
@@ -806,7 +833,7 @@ class MainActivity : Activity() {
                     }
                     EventStore.setEmailNotificationEnabled(this@MainActivity, true)
                     Toast.makeText(this@MainActivity, "Đã bật thông báo email.", Toast.LENGTH_SHORT).show()
-                    showGuideTab()
+                    showNotificationSettingsTab()
                 }
             }
         }
@@ -998,7 +1025,7 @@ class MainActivity : Activity() {
                 val nextMask = if (currentMask and bit != 0) currentMask and bit.inv() else currentMask or bit
                 EventStore.setDailySummaryDaysMask(this@MainActivity, nextMask)
                 ReminderScheduler.scheduleDailySummary(this@MainActivity)
-                showGuideTab()
+                showNotificationSettingsTab()
             }
         }
     }
@@ -1033,7 +1060,7 @@ class MainActivity : Activity() {
                 }
                 EventStore.setReminderOffsetEnabled(this@MainActivity, minutes, !selected)
                 ReminderScheduler.scheduleAll(this@MainActivity, activeEventsForReminders())
-                showGuideTab()
+                showNotificationSettingsTab()
             }
         }
     }
@@ -1099,7 +1126,7 @@ class MainActivity : Activity() {
             }
             EventStore.setReminderOffsetEnabled(this, minutes, !selected)
             ReminderScheduler.scheduleAll(this, activeEventsForReminders())
-            showGuideTab()
+            showNotificationSettingsTab()
         }
         return container
     }
@@ -1112,111 +1139,86 @@ class MainActivity : Activity() {
             .setPositiveButton("Xóa") { _, _ ->
                 EventStore.removeCustomReminderOffset(this, minutes)
                 ReminderScheduler.scheduleAll(this, activeEventsForReminders())
-                showGuideTab()
+                showNotificationSettingsTab()
             }
             .setNegativeButton("Hủy", null)
             .show()
     }
 
+    private fun reminderTimeInput(labelText: String, input: EditText): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
+
+            addView(TextView(this@MainActivity).apply {
+                text = labelText
+                textSize = 14f
+                setTextColor(ink)
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }, LinearLayout.LayoutParams(dp(72), dp(44)))
+
+            addView(input, LinearLayout.LayoutParams(0, dp(44), 1f))
+        }
+    }
+
+    private fun reminderNumberInput(): EditText {
+        return EditText(this).apply {
+            hint = "0"
+            inputType = InputType.TYPE_CLASS_NUMBER
+            textSize = 16f
+            setTextColor(ink)
+            setHintTextColor(Color.rgb(148, 163, 184))
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            selectAllOnFocus = true
+        }
+    }
+
     private fun showAddCustomReminderDialog() {
         val dialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(16), dp(20), dp(8))
+            setPadding(dp(18), dp(14), dp(18), dp(4))
         }
 
         dialogLayout.addView(TextView(this).apply {
             text = "Nhắc trước bao lâu?"
             textSize = 13f
             setTextColor(muted)
-            setPadding(0, 0, 0, dp(12))
+            setPadding(0, 0, 0, dp(10))
         })
 
-        // Hàng nhập số ngày
-        val daysRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val daysInput = EditText(this).apply {
-            hint = "0"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 16f
-            setTextColor(ink)
-            gravity = Gravity.CENTER
-            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-        }
-        daysRow.addView(daysInput, LinearLayout.LayoutParams(dp(72), dp(44)))
-        daysRow.addView(TextView(this).apply {
-            text = "ngày"
-            textSize = 14f
-            setTextColor(ink)
-            setPadding(dp(10), 0, dp(20), 0)
-            gravity = Gravity.CENTER_VERTICAL
-        }, LinearLayout.LayoutParams(wrap(), dp(44)))
+        val daysInput = reminderNumberInput()
+        val hoursInput = reminderNumberInput()
+        val minutesInput = reminderNumberInput()
 
-        // Hàng nhập số giờ
-        val hoursInput = EditText(this).apply {
-            hint = "0"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 16f
-            setTextColor(ink)
-            gravity = Gravity.CENTER
-            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-        }
-        daysRow.addView(hoursInput, LinearLayout.LayoutParams(dp(72), dp(44)))
-        daysRow.addView(TextView(this).apply {
-            text = "giờ"
-            textSize = 14f
-            setTextColor(ink)
-            setPadding(dp(10), 0, dp(20), 0)
-            gravity = Gravity.CENTER_VERTICAL
-        }, LinearLayout.LayoutParams(wrap(), dp(44)))
+        dialogLayout.addView(reminderTimeInput("Ngày", daysInput))
+        dialogLayout.addView(reminderTimeInput("Giờ", hoursInput))
+        dialogLayout.addView(reminderTimeInput("Phút", minutesInput))
 
-        // Hàng nhập số phút
-        val minutesInput = EditText(this).apply {
-            hint = "0"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 16f
-            setTextColor(ink)
-            gravity = Gravity.CENTER
-            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-        }
-        daysRow.addView(minutesInput, LinearLayout.LayoutParams(dp(72), dp(44)))
-        daysRow.addView(TextView(this).apply {
-            text = "phút"
-            textSize = 14f
-            setTextColor(ink)
-            setPadding(dp(10), 0, 0, 0)
-            gravity = Gravity.CENTER_VERTICAL
-        }, LinearLayout.LayoutParams(wrap(), dp(44)))
-
-        dialogLayout.addView(daysRow)
-
-        // Preview label
         val previewText = TextView(this).apply {
             text = "Nhập số ngày/giờ/phút"
             textSize = 12f
             setTextColor(muted)
-            setPadding(0, dp(10), 0, 0)
+            setPadding(0, dp(2), 0, dp(2))
             gravity = Gravity.CENTER
         }
         dialogLayout.addView(previewText, LinearLayout.LayoutParams(match(), wrap()))
 
-        // Cập nhật preview realtime
-        val watcher = object : android.text.TextWatcher {
+        val watcher = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: android.text.Editable?) {
+            override fun afterTextChanged(s: Editable?) {
                 val d = daysInput.text.toString().toLongOrNull() ?: 0L
                 val h = hoursInput.text.toString().toLongOrNull() ?: 0L
                 val m = minutesInput.text.toString().toLongOrNull() ?: 0L
                 val total = d * 24L * 60L + h * 60L + m
-                previewText.text = if (total > 0)
+                previewText.text = if (total > 0) {
                     "→ Nhắc trước ${EventStore.reminderOptionLabel(total)}"
-                else
+                } else {
                     "Nhập số ngày/giờ/phút"
+                }
                 previewText.setTextColor(if (total > 0) blueDark else muted)
             }
         }
@@ -1224,34 +1226,44 @@ class MainActivity : Activity() {
         hoursInput.addTextChangedListener(watcher)
         minutesInput.addTextChangedListener(watcher)
 
-        android.app.AlertDialog.Builder(this)
+        val dialog = android.app.AlertDialog.Builder(this)
             .setTitle("Thêm mốc nhắc tùy chỉnh")
             .setView(dialogLayout)
-            .setPositiveButton("Thêm") { _, _ ->
+            .setPositiveButton("Thêm", null)
+            .setNegativeButton("Hủy", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val d = daysInput.text.toString().toLongOrNull() ?: 0L
                 val h = hoursInput.text.toString().toLongOrNull() ?: 0L
                 val m = minutesInput.text.toString().toLongOrNull() ?: 0L
                 val total = d * 24L * 60L + h * 60L + m
                 when {
-                    total <= 0 -> Toast.makeText(this, "Hãy nhập ít nhất 1 phút.", Toast.LENGTH_SHORT).show()
-                    total > 30L * 24L * 60L -> Toast.makeText(this, "Mốc nhắc tối đa 30 ngày.", Toast.LENGTH_SHORT).show()
+                    total <= 0 -> {
+                        Toast.makeText(this, "Hãy nhập ít nhất 1 phút.", Toast.LENGTH_SHORT).show()
+                    }
+                    total > 30L * 24L * 60L -> {
+                        Toast.makeText(this, "Mốc nhắc tối đa 30 ngày.", Toast.LENGTH_SHORT).show()
+                    }
                     EventStore.getAllReminderOffsetOptions(this).contains(total) -> {
-                        // Đã tồn tại → chỉ bật lên
                         EventStore.setReminderOffsetEnabled(this, total, true)
                         ReminderScheduler.scheduleAll(this, activeEventsForReminders())
                         Toast.makeText(this, "Đã bật mốc ${EventStore.reminderOptionLabel(total)}.", Toast.LENGTH_SHORT).show()
-                        showGuideTab()
+                        dialog.dismiss()
+                        showNotificationSettingsTab()
                     }
                     else -> {
                         EventStore.addCustomReminderOffset(this, total)
                         ReminderScheduler.scheduleAll(this, activeEventsForReminders())
                         Toast.makeText(this, "Đã thêm mốc ${EventStore.reminderOptionLabel(total)}.", Toast.LENGTH_SHORT).show()
-                        showGuideTab()
+                        dialog.dismiss()
+                        showNotificationSettingsTab()
                     }
                 }
             }
-            .setNegativeButton("Hủy", null)
-            .show()
+        }
+        dialog.show()
     }
 
     private fun showDailyTimePicker() {
@@ -1263,7 +1275,7 @@ class MainActivity : Activity() {
                     EventStore.setDailySummaryDaysMask(this, EventStore.ALL_DAYS_MASK)
                 }
                 ReminderScheduler.scheduleDailySummary(this)
-                showGuideTab()
+                showNotificationSettingsTab()
             },
             EventStore.getDailySummaryHour(this),
             EventStore.getDailySummaryMinute(this),
@@ -2098,7 +2110,8 @@ class MainActivity : Activity() {
 
     private enum class ScreenTab {
         CALENDAR,
-        GUIDE
+        GUIDE,
+        NOTIFICATION_SETTINGS
     }
 
     private enum class EventViewMode {

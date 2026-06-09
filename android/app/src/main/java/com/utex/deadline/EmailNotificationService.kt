@@ -110,6 +110,7 @@ object EmailNotificationService {
         }
 
         val subject = "✅ Test Email - UTE Notice"
+        val safeUserEmail = escapeHtml(userEmail)
         val message = """
             <!DOCTYPE html>
             <html>
@@ -131,7 +132,7 @@ object EmailNotificationService {
                 
                 <div style="margin-top: 20px; padding: 15px; background: #e0f2fe; border-left: 4px solid #00529c; border-radius: 4px;">
                     <p style="margin: 0; color: #003670; font-size: 14px;">
-                        <strong>Email của bạn:</strong> $userEmail<br>
+                        <strong>Email của bạn:</strong> $safeUserEmail<br>
                         <strong>Thời gian test:</strong> ${formatTime(System.currentTimeMillis())}
                     </p>
                 </div>
@@ -150,10 +151,14 @@ object EmailNotificationService {
      * Xây dựng nội dung email cho deadline
      */
     private fun buildEmailMessage(context: Context, event: DeadlineEvent, headerText: String): String {
-        val instant = Instant.ofEpochMilli(event.startAtMillis)
-        val course = EventLabels.course(event) ?: "Không rõ"
-        val description = EventLabels.cleanDescription(event) ?: "Không có mô tả"
-        val remainText = calculateRemainText(event.startAtMillis)
+        val safeHeaderText = escapeHtml(headerText)
+        val safeKind = escapeHtml(EventLabels.kind(event))
+        val safeTitle = escapeHtml(event.title)
+        val safeCourse = escapeHtml(EventLabels.course(event) ?: "Không rõ")
+        val safeTimeLabel = escapeHtml(EventLabels.timeLabel(event))
+        val safeDescription = escapeHtml(EventLabels.cleanDescription(event) ?: "Không có mô tả")
+        val safeRemainText = escapeHtml(calculateRemainText(event.startAtMillis))
+        val safeReminderOffsetsText = escapeHtml(EventStore.reminderOffsetsText(context))
         
         val accentColor = when {
             event.startAtMillis - System.currentTimeMillis() <= 24L * 60L * 60L * 1000L -> "#da2529"
@@ -166,41 +171,44 @@ object EmailNotificationService {
             <html>
             <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="background: linear-gradient(135deg, #00529c 0%, #003670 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h1 style="margin: 0; font-size: 24px;">$headerText</h1>
+                    <h1 style="margin: 0; font-size: 24px;">$safeHeaderText</h1>
                 </div>
                 
                 <div style="background: #ffffff; border: 2px solid #dee5ee; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                     <div style="background: ${accentColor}15; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
                         <span style="background: $accentColor; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold;">
-                            ${EventLabels.kind(event)}
+                            $safeKind
                         </span>
                     </div>
                     
-                    <h2 style="color: #1e293b; margin: 15px 0 10px 0; font-size: 18px;">${event.title}</h2>
+                    <h2 style="color: #1e293b; margin: 15px 0 10px 0; font-size: 18px;">$safeTitle</h2>
                     
                     <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 15px 0;">
-                        <p style="margin: 5px 0; color: #475569;"><strong>📚 Môn/Lớp:</strong> $course</p>
-                        <p style="margin: 5px 0; color: #475569;"><strong>⏰ ${EventLabels.timeLabel(event)}:</strong> ${formatTime(event.startAtMillis)}</p>
-                        <p style="margin: 5px 0; color: $accentColor; font-weight: bold;"><strong>⏳ Thời gian còn lại:</strong> $remainText</p>
+                        <p style="margin: 5px 0; color: #475569;"><strong>📚 Môn/Lớp:</strong> $safeCourse</p>
+                        <p style="margin: 5px 0; color: #475569;"><strong>⏰ $safeTimeLabel:</strong> ${formatTime(event.startAtMillis)}</p>
+                        <p style="margin: 5px 0; color: $accentColor; font-weight: bold;"><strong>⏳ Thời gian còn lại:</strong> $safeRemainText</p>
                     </div>
                     
                     <div style="background: #e0f2fe; padding: 15px; border-left: 4px solid #00529c; border-radius: 4px; margin: 15px 0;">
                         <p style="margin: 0; color: #003670; font-size: 14px;"><strong>📝 Mô tả:</strong></p>
-                        <p style="margin: 10px 0 0 0; color: #003670;">$description</p>
+                        <p style="margin: 10px 0 0 0; color: #003670;">$safeDescription</p>
                     </div>
                     
-                    ${event.sourceUrl?.let { url -> """
+                    ${event.sourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                        val safeUrl = escapeHtml(url)
+                        """
                     <div style="text-align: center; margin-top: 20px;">
-                        <a href="$url" style="display: inline-block; background: #00529c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                        <a href="$safeUrl" style="display: inline-block; background: #00529c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                             Mở trên Moodle
                         </a>
                     </div>
-                    """ } ?: ""}
+                        """
+                    } ?: ""}
                 </div>
                 
                 <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-left: 4px solid #ca7400; border-radius: 4px;">
                     <p style="margin: 0; color: #92400e; font-size: 13px;">
-                        <strong>💡 Mẹo:</strong> Mốc nhắc đang bật: ${EventStore.reminderOffsetsText(context)} trước hạn.
+                        <strong>💡 Mẹo:</strong> Mốc nhắc đang bật: $safeReminderOffsetsText trước hạn.
                     </p>
                 </div>
                 
@@ -218,7 +226,10 @@ object EmailNotificationService {
      */
     private fun buildDailySummaryMessage(context: Context, events: List<DeadlineEvent>): String {
         val eventsHtml = events.joinToString("") { event ->
-            val remainText = calculateRemainText(event.startAtMillis)
+            val safeKind = escapeHtml(EventLabels.kind(event))
+            val safeTitle = escapeHtml(event.title)
+            val safeCourse = escapeHtml(EventLabels.course(event) ?: "Không rõ môn")
+            val safeRemainText = escapeHtml(calculateRemainText(event.startAtMillis))
             val accentColor = when {
                 event.startAtMillis - System.currentTimeMillis() <= 24L * 60L * 60L * 1000L -> "#da2529"
                 event.startAtMillis - System.currentTimeMillis() <= 3L * 24L * 60L * 60L * 1000L -> "#ca7400"
@@ -229,13 +240,13 @@ object EmailNotificationService {
             <div style="background: white; border: 1px solid #dee5ee; border-radius: 8px; padding: 15px; margin-bottom: 12px;">
                 <div style="margin-bottom: 10px;">
                     <span style="background: $accentColor; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;">
-                        ${EventLabels.kind(event)}
+                        $safeKind
                     </span>
                 </div>
-                <h3 style="margin: 10px 0; color: #1e293b; font-size: 16px;">${event.title}</h3>
-                <p style="margin: 5px 0; color: #64748b; font-size: 13px;">📚 ${EventLabels.course(event) ?: "Không rõ môn"}</p>
+                <h3 style="margin: 10px 0; color: #1e293b; font-size: 16px;">$safeTitle</h3>
+                <p style="margin: 5px 0; color: #64748b; font-size: 13px;">📚 $safeCourse</p>
                 <p style="margin: 5px 0; color: #64748b; font-size: 13px;">⏰ ${formatTime(event.startAtMillis)}</p>
-                <p style="margin: 5px 0; color: $accentColor; font-weight: bold; font-size: 13px;">⏳ $remainText</p>
+                <p style="margin: 5px 0; color: $accentColor; font-weight: bold; font-size: 13px;">⏳ $safeRemainText</p>
             </div>
             """.trimIndent()
         }
@@ -305,6 +316,15 @@ object EmailNotificationService {
                 callback(false, "Lỗi gửi email: ${e.message}")
             }
         }
+    }
+
+    private fun escapeHtml(value: String): String {
+        return value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
     }
 
     private fun formatTime(millis: Long): String = timeFormatter.format(Instant.ofEpochMilli(millis))
