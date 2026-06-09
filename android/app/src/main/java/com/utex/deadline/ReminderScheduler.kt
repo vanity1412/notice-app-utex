@@ -117,7 +117,8 @@ object ReminderScheduler {
             .flatMap { event ->
                 reminderOffsets.mapNotNull { offset ->
                     val triggerAt = event.startAtMillis - offset.minutes * 60_000L
-                    if (triggerAt <= now) {
+                    // Cho phép schedule cho cả mốc 0 phút (đúng lúc deadline)
+                    if (triggerAt < now) {
                         null
                     } else {
                         ReminderPlan(

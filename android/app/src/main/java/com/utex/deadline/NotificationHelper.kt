@@ -20,9 +20,11 @@ import java.util.Locale
 
 object NotificationHelper {
     private const val ALERT_CHANNEL_ID = "ute_deadline_alerts_v2"
+    private const val CRITICAL_CHANNEL_ID = "ute_deadline_critical_v1"
     private const val SUMMARY_CHANNEL_ID = "ute_deadline_summary_v1"
-    private const val DAILY_SUMMARY_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1000L
+    private const val DAILY_SUMMARY_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1000L // Chỉ dùng cho pending notification expiry
     private val vibrationPattern = longArrayOf(0L, 280L, 160L, 280L)
+    private val criticalVibrationPattern = longArrayOf(0L, 400L, 200L, 400L, 200L, 400L)
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
         .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
 
@@ -46,6 +48,24 @@ object NotificationHelper {
                         .build()
                 )
             }
+            val criticalChannel = NotificationChannel(
+                CRITICAL_CHANNEL_ID,
+                "UTE Notice - Khẩn cấp",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Deadline cực kỳ gấp (< 30 phút hoặc đã tới hạn)"
+                enableVibration(true)
+                setVibrationPattern(this@NotificationHelper.criticalVibrationPattern)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setSound(
+                    android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+                    android.media.AudioAttributes.Builder()
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                )
+            }
             val summaryChannel = NotificationChannel(
                 SUMMARY_CHANNEL_ID,
                 "UTE Notice - Tổng hợp",
@@ -57,6 +77,7 @@ object NotificationHelper {
             }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(alertChannel)
+            manager.createNotificationChannel(criticalChannel)
             manager.createNotificationChannel(summaryChannel)
         }
     }
@@ -91,14 +112,19 @@ object NotificationHelper {
 
     fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String, leadMinutes: Long = 60L): Boolean {
         val priority = calculateReminderPriority(leadMinutes)
+        val isCritical = leadMinutes <= 30L
+        val ongoing = leadMinutes <= 15L // Không thể vuốt bỏ nếu <= 15 phút
+        
         return show(
             context = context,
-            title = "Cảnh báo: $leadText",
+            title = if (isCritical) "⚠️ KHẨN CẤP: $leadText" else "Cảnh báo: $leadText",
             message = eventMessage(context, event),
             id = stableNotificationId("reminder-${event.id}-$leadText"),
             targetUrl = event.sourceUrl,
             withSound = true,
-            priority = priority
+            priority = priority,
+            ongoing = ongoing,
+            useCriticalChannel = isCritical
         )
     }
 
@@ -138,7 +164,7 @@ object NotificationHelper {
         val summaryEvents = dailySummaryEvents(context, events, now)
 
         val upcoming = summaryEvents
-            .take(3)
+            .take(5)
 
         if (upcoming.isEmpty()) {
             return false
@@ -147,10 +173,14 @@ object NotificationHelper {
         val lines = upcoming.joinToString("\n") { event ->
             "- ${EventLabels.kind(event)}: ${event.title} - ${formatTime(event.startAtMillis)}"
         }
+        
+        val totalText = if (summaryEvents.size > 1) "${summaryEvents.size} mục" else "1 mục"
+        val moreText = if (summaryEvents.size > upcoming.size) " (hiển thị ${upcoming.size} đầu tiên)" else ""
+        
         return show(
             context = context,
             title = "Nhắc lịch sắp tới",
-            message = "Có ${summaryEvents.size} mục sắp tới trong 3 ngày.\n$lines",
+            message = "Có $totalText sắp tới$moreText.\n$lines",
             id = stableNotificationId("daily-summary"),
             timestamp = now
         )
@@ -227,7 +257,9 @@ object NotificationHelper {
         targetUrl: String? = null, 
         withSound: Boolean = false, 
         timestamp: Long? = null,
-        priority: Int? = null
+        priority: Int? = null,
+        ongoing: Boolean = false,
+        useCriticalChannel: Boolean = false
     ): Boolean {
         if (!canPostNotifications(context)) {
             return false
@@ -243,8 +275,12 @@ object NotificationHelper {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val channelId = if (withSound) ALERT_CHANNEL_ID else SUMMARY_CHANNEL_ID
-        val notificationPriority = priority ?: if (withSound) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW
+        val channelId = when {
+            useCriticalChannel -> CRITICAL_CHANNEL_ID
+            withSound -> ALERT_CHANNEL_ID
+            else -> SUMMARY_CHANNEL_ID
+        }
+        val notificationPriority = priority ?: if (withSound || useCriticalChannel) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW
         
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_ute_notice)
@@ -252,14 +288,20 @@ object NotificationHelper {
             .setContentText(message.lineSequence().firstOrNull().orEmpty())
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(notificationPriority)
-            .setAutoCancel(true)
+            .setAutoCancel(!ongoing)
+            .setOngoing(ongoing)
             .setContentIntent(pendingIntent)
         
-        if (withSound) {
+        if (withSound || useCriticalChannel) {
             builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
-            builder.setVibrate(vibrationPattern)
+            builder.setVibrate(if (useCriticalChannel) criticalVibrationPattern else vibrationPattern)
         } else {
             builder.setSilent(true)
+        }
+        
+        if (useCriticalChannel) {
+            builder.setCategory(NotificationCompat.CATEGORY_ALARM)
+            builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         }
         
         return try {
@@ -302,7 +344,7 @@ object NotificationHelper {
     ): List<DeadlineEvent> {
         return events
             .filterNot { EventStore.isDone(context, it.id) }
-            .filter { it.startAtMillis in now..(now + DAILY_SUMMARY_WINDOW_MILLIS) }
+            .filter { it.startAtMillis > now } // Chỉ lọc deadline chưa quá hạn, không giới hạn khoảng thời gian
             .sortedBy { it.startAtMillis }
     }
 

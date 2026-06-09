@@ -25,7 +25,7 @@ object EventStore {
     private const val KEY_PENDING_NOTIFICATIONS = "pending_notifications_json"
     private const val KEY_SCHEDULED_REMINDER_ALARMS = "scheduled_reminder_alarms"
     const val ALL_DAYS_MASK = 0b1111111
-    private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L)
+    private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L, 0L)
     private val PRESET_REMINDER_MINUTES = listOf(
         7L * 24L * 60L,      // 7 ngày
         3L * 24L * 60L,      // 3 ngày  
@@ -35,7 +35,9 @@ object EventStore {
         6L * 60L,            // 6 giờ
         3L * 60L,            // 3 giờ
         60L,                 // 1 giờ
-        30L                  // 30 phút
+        30L,                 // 30 phút
+        15L,                 // 15 phút
+        0L                   // Đúng lúc deadline
     )
     @Volatile
     private var cachedPrefs: SharedPreferences? = null
@@ -358,6 +360,7 @@ object EventStore {
 
     fun reminderOptionLabel(minutes: Long): String {
         return when (minutes) {
+            0L -> "Đúng lúc deadline"
             7L * 24L * 60L -> "7 ngày"
             3L * 24L * 60L -> "3 ngày"
             2L * 24L * 60L -> "2 ngày"
@@ -367,6 +370,7 @@ object EventStore {
             3L * 60L -> "3 giờ"
             60L -> "1 giờ"
             30L -> "30 phút"
+            15L -> "15 phút"
             else -> {
                 // Format custom reminders
                 val days = minutes / (24L * 60L)
@@ -385,7 +389,11 @@ object EventStore {
     }
 
     fun reminderLeadLabel(minutes: Long): String {
-        return "${reminderOptionLabel(minutes)} trước hạn"
+        return if (minutes == 0L) {
+            "ĐÃ TỚI HẠN"
+        } else {
+            "${reminderOptionLabel(minutes)} trước hạn"
+        }
     }
 
     fun reminderOffsetsText(context: Context): String {

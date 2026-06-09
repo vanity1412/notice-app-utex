@@ -11,12 +11,17 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : Worker(app
         val leadMinutes = inputData.getLong("leadMinutes", 0L)
         val now = System.currentTimeMillis()
 
-        if (startAt <= 0L || now >= startAt) {
+        if (startAt <= 0L) {
             return Result.success()
         }
 
+        // Cho phép thông báo ngay cả khi đã quá hạn (nhưng không quá 1 giờ)
+        if (now > startAt + 60 * 60_000L) {
+            return Result.success() // Quá hạn hơn 1 giờ thì không thông báo nữa
+        }
+
         val expectedReminderTime = startAt - (leadMinutes * 60_000L)
-        if (now < expectedReminderTime) {
+        if (now < expectedReminderTime - 5 * 60_000L) { // Cho phép sai số 5 phút
             return Result.retry()
         }
 

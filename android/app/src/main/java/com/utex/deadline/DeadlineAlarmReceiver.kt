@@ -18,8 +18,13 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         val leadMinutes = intent.getLongExtra(EXTRA_LEAD_MINUTES, 0L)
         val now = System.currentTimeMillis()
 
-        if (startAt <= 0L || now >= startAt) {
+        if (startAt <= 0L) {
             return
+        }
+
+        // Cho phép thông báo ngay cả khi đã quá hạn (nhưng không quá 1 giờ)
+        if (now > startAt + 60 * 60_000L) {
+            return // Quá hạn hơn 1 giờ thì không thông báo nữa
         }
 
         val event = DeadlineEvent(
