@@ -24,6 +24,7 @@ object EventStore {
     private const val KEY_CUSTOM_REMINDER_OFFSETS = "custom_reminder_offsets"
     private const val KEY_PENDING_NOTIFICATIONS = "pending_notifications_json"
     private const val KEY_SCHEDULED_REMINDER_ALARMS = "scheduled_reminder_alarms"
+    private const val KEY_DELIVERED_NOTIFICATION_KEYS = "delivered_notification_keys"
     private const val KEY_USER_EMAIL = "user_email"
     private const val KEY_EMAIL_NOTIFICATION_ENABLED = "email_notification_enabled"
     const val ALL_DAYS_MASK = 0b1111111
@@ -41,6 +42,7 @@ object EventStore {
         15L,                 // 15 phút
         0L                   // Đúng lúc deadline
     )
+    private const val MAX_DELIVERED_NOTIFICATION_KEYS = 600
     @Volatile
     private var cachedPrefs: SharedPreferences? = null
     @Volatile
@@ -66,6 +68,7 @@ object EventStore {
             .remove(KEY_DONE_IDS)
             .remove(KEY_PENDING_NOTIFICATIONS)
             .remove(KEY_SCHEDULED_REMINDER_ALARMS)
+            .remove(KEY_DELIVERED_NOTIFICATION_KEYS)
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
             .apply()
         cachedEvents = emptyList()
@@ -209,7 +212,11 @@ object EventStore {
                 val key = obj.optString("key").takeIf { it.isNotBlank() } ?: "$type-${event.id}"
                 val timestamp = obj.optLong("timestamp", 0L).takeIf { it > 0L }
                 val leadText = obj.optString("leadText").takeIf { it.isNotBlank() }
-                val leadMinutes = obj.optLong("leadMinutes", 0L).takeIf { it > 0L }
+                val leadMinutes = if (obj.has("leadMinutes")) {
+                    obj.optLong("leadMinutes", 0L).takeIf { it >= 0L }
+                } else {
+                    null
+                }
                 PendingDeadlineNotification(key, type, event, timestamp, leadText, leadMinutes)
             }
         } catch (_: Exception) {
@@ -250,6 +257,33 @@ object EventStore {
 
     fun clearScheduledReminderAlarmKeys(context: Context) {
         prefs(context).edit().remove(KEY_SCHEDULED_REMINDER_ALARMS).apply()
+    }
+
+    /**
+     * Tránh bắn lặp cùng một mốc khi cả AlarmManager và WorkManager backup cùng chạy.
+     * Trả về true nếu đây là lần đầu xử lý key này, false nếu đã xử lý trước đó.
+     */
+    fun tryMarkNotificationDelivery(context: Context, key: String): Boolean {
+        val safeKey = key.trim().takeIf { it.isNotBlank() } ?: return true
+        return synchronized(this) {
+            val preferences = prefs(context)
+            val current = preferences.getStringSet(KEY_DELIVERED_NOTIFICATION_KEYS, emptySet())
+                ?.toMutableSet()
+                ?: mutableSetOf()
+            if (safeKey in current) {
+                return@synchronized false
+            }
+            if (current.size >= MAX_DELIVERED_NOTIFICATION_KEYS) {
+                current.clear()
+            }
+            current += safeKey
+            preferences.edit().putStringSet(KEY_DELIVERED_NOTIFICATION_KEYS, current).commit()
+            true
+        }
+    }
+
+    fun clearNotificationDeliveryHistory(context: Context) {
+        prefs(context).edit().remove(KEY_DELIVERED_NOTIFICATION_KEYS).apply()
     }
 
     fun getDoneIds(context: Context): Set<String> {
@@ -540,6 +574,7 @@ object EventStore {
             .remove(KEY_CUSTOM_REMINDER_OFFSETS)
             .remove(KEY_PENDING_NOTIFICATIONS)
             .remove(KEY_SCHEDULED_REMINDER_ALARMS)
+            .remove(KEY_DELIVERED_NOTIFICATION_KEYS)
             .apply()
     }
 }

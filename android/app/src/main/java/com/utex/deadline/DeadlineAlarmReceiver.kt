@@ -27,8 +27,9 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
             return // Quá hạn hơn 1 giờ thì không thông báo nữa
         }
 
+        val eventId = intent.getStringExtra(EXTRA_ID) ?: "$title-$startAt"
         val event = DeadlineEvent(
-            id = intent.getStringExtra(EXTRA_ID) ?: "$title-$startAt",
+            id = eventId,
             title = title,
             startAtMillis = startAt,
             sourceUrl = intent.getStringExtra(EXTRA_SOURCE_URL)?.takeIf { it.isNotBlank() },
@@ -37,6 +38,12 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         )
 
         if (EventStore.isDone(context, event.id)) {
+            return
+        }
+
+        val reminderKey = intent.getStringExtra(EXTRA_REMINDER_KEY)
+            ?: "reminder-${event.id}-${event.startAtMillis}-$leadMinutes"
+        if (!EventStore.tryMarkNotificationDelivery(context, reminderKey)) {
             return
         }
 
@@ -67,33 +74,44 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
     private fun handleDailySummary(context: Context) {
         if (EventStore.isDailySummaryEnabled(context) && EventStore.isDailySummaryAllowedToday(context)) {
             val events = EventStore.loadEvents(context)
-            val sent = NotificationHelper.notifyDailySummary(context, events)
-            if (!sent && !NotificationHelper.canPostNotifications(context) &&
-                NotificationHelper.hasUpcomingDailySummary(context, events)) {
-                val now = System.currentTimeMillis()
-                EventStore.upsertPendingDeadlineNotifications(
-                    context,
-                    listOf(
-                        PendingDeadlineNotification(
-                            key = "daily-summary-$now",
-                            type = "daily-summary",
-                            event = DeadlineEvent(
-                                id = "daily-summary",
-                                title = "Daily Summary",
-                                startAtMillis = now
-                            ),
-                            timestamp = now
+            if (NotificationHelper.hasUpcomingDailySummary(context, events)) {
+                val deliveryKey = dailySummaryDeliveryKey(context)
+                if (EventStore.tryMarkNotificationDelivery(context, deliveryKey)) {
+                    val sent = NotificationHelper.notifyDailySummary(context, events)
+                    if (!sent && !NotificationHelper.canPostNotifications(context)) {
+                        val now = System.currentTimeMillis()
+                        EventStore.upsertPendingDeadlineNotifications(
+                            context,
+                            listOf(
+                                PendingDeadlineNotification(
+                                    key = deliveryKey,
+                                    type = "daily-summary",
+                                    event = DeadlineEvent(
+                                        id = "daily-summary",
+                                        title = "Daily Summary",
+                                        startAtMillis = now
+                                    ),
+                                    timestamp = now
+                                )
+                            )
                         )
-                    )
-                )
-            }
-            
-            // Gửi email daily summary nếu được bật
-            if (EventStore.isEmailNotificationEnabled(context)) {
-                EmailNotificationService.sendDailySummaryEmail(context, events) { _, _ -> }
+                    }
+                    
+                    // Gửi email daily summary nếu được bật
+                    if (EventStore.isEmailNotificationEnabled(context)) {
+                        EmailNotificationService.sendDailySummaryEmail(context, events) { _, _ -> }
+                    }
+                }
             }
         }
         ReminderScheduler.scheduleDailySummary(context)
+    }
+
+    private fun dailySummaryDeliveryKey(context: Context): String {
+        val date = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        val hour = EventStore.getDailySummaryHour(context)
+        val minute = EventStore.getDailySummaryMinute(context)
+        return "daily-summary-$date-$hour-$minute"
     }
 
     companion object {
@@ -108,5 +126,6 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_DESCRIPTION = "description"
         const val EXTRA_LEAD_TEXT = "leadText"
         const val EXTRA_LEAD_MINUTES = "leadMinutes"
+        const val EXTRA_REMINDER_KEY = "reminderKey"
     }
 }

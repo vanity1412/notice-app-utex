@@ -25,8 +25,9 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : Worker(app
             return Result.retry()
         }
 
+        val eventId = inputData.getString("id") ?: "$title-$startAt"
         val event = DeadlineEvent(
-            id = inputData.getString("id") ?: "$title-$startAt",
+            id = eventId,
             title = title,
             startAtMillis = startAt,
             sourceUrl = inputData.getString("sourceUrl")?.takeIf { it.isNotBlank() },
@@ -35,6 +36,12 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : Worker(app
         )
 
         if (EventStore.isDone(applicationContext, event.id)) {
+            return Result.success()
+        }
+
+        val reminderKey = inputData.getString("reminderKey")
+            ?: "reminder-${event.id}-${event.startAtMillis}-$leadMinutes"
+        if (!EventStore.tryMarkNotificationDelivery(applicationContext, reminderKey)) {
             return Result.success()
         }
 

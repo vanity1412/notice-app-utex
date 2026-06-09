@@ -65,6 +65,7 @@ class MainActivity : Activity() {
     private var selectedFilter = EventFilter.ALL
     private var hideDoneEvents = true
     private var syncInProgress = false
+    private var setupPromptShown = false
 
     private val localZone = ZoneId.of("Asia/Ho_Chi_Minh")
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm - EEEE dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
@@ -97,6 +98,7 @@ class MainActivity : Activity() {
         buildUi()
         ReminderScheduler.schedulePeriodicSync(this)
         refreshScheduledNotifications()
+        promptRequiredAlertSetupIfNeeded(force = false)
     }
 
     override fun onResume() {
@@ -106,12 +108,17 @@ class MainActivity : Activity() {
         if (::notificationChip.isInitialized) updateNotificationChip()
         if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
         NotificationHelper.flushPendingDeadlineNotifications(this)
+        promptRequiredAlertSetupIfNeeded(force = false)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1001 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             NotificationHelper.flushPendingDeadlineNotifications(this)
+        }
+        if (requestCode == 1001) {
+            setupPromptShown = false
+            promptRequiredAlertSetupIfNeeded(force = false)
         }
         if (::notificationChip.isInitialized) updateNotificationChip()
         if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
@@ -717,6 +724,12 @@ class MainActivity : Activity() {
             setOnClickListener { sendTestNotification() }
         }, LinearLayout.LayoutParams(match(), dp(42)))
 
+        panel.addView(secondaryButton("Cài đặt thông báo Android").apply {
+            setOnClickListener { openNotificationPermissionOrSettings() }
+        }, LinearLayout.LayoutParams(match(), dp(42)).apply {
+            topMargin = dp(6)
+        })
+
         val healthSettingsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -900,11 +913,18 @@ class MainActivity : Activity() {
 
     private fun sendTestNotification() {
         if (!NotificationHelper.canPostNotifications(this)) {
-            if (Build.VERSION.SDK_INT >= 33 &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
-            }
-            Toast.makeText(this, "Hãy bật quyền thông báo rồi bấm Gửi test lại.", Toast.LENGTH_LONG).show()
+            openNotificationPermissionOrSettings()
+            Toast.makeText(this, "Hãy bật quyền thông báo và kênh UTE Notice rồi bấm Gửi test lại.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!isIgnoringBatteryOptimizations()) {
+            promptRequiredAlertSetupIfNeeded(force = true)
+            Toast.makeText(this, "Cần đặt pin ở Không hạn chế để nhận cảnh báo nền.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!ReminderScheduler.canScheduleExactAlarms(this)) {
+            promptRequiredAlertSetupIfNeeded(force = true)
+            Toast.makeText(this, "Cần bật Báo đúng giờ để nhắc sát thời điểm deadline.", Toast.LENGTH_LONG).show()
             return
         }
         val sent = NotificationHelper.notifyTest(this)
@@ -919,25 +939,36 @@ class MainActivity : Activity() {
 
     private fun refreshNotificationHealthText() {
         if (!::notificationHealthText.isInitialized) return
-        val notificationStatus = if (NotificationHelper.canPostNotifications(this)) {
-            "✓ Thông báo: sẵn sàng"
+        val readyStatus = if (isAlertSetupReady()) {
+            "✓ Trạng thái cảnh báo: SẴN SÀNG"
         } else {
-            "✗ Thông báo: chưa bật hoặc chưa cấp quyền"
+            "⚠ Trạng thái cảnh báo: CHƯA SẴN SÀNG"
+        }
+        val notificationStatus = if (NotificationHelper.canPostNotifications(this)) {
+            "✓ Thông báo/kênh cảnh báo: đã bật"
+        } else {
+            "✗ Thông báo/kênh cảnh báo: chưa bật hoặc bị tắt trong cài đặt Android"
         }
         val batteryStatus = if (isIgnoringBatteryOptimizations()) {
-            "✓ Tối ưu pin: đã tắt (tốt)"
+            "✓ Pin: Không hạn chế / đã bỏ tối ưu pin"
         } else {
-            "⚠ Tối ưu pin: nên tắt để nhận thông báo đầy đủ"
+            "✗ BẮT BUỘC: đặt Pin thành Không hạn chế để nhận cảnh báo nền"
         }
         val exactAlarmStatus = if (ReminderScheduler.canScheduleExactAlarms(this)) {
             "✓ Báo đúng giờ: đã cho phép exact alarm"
         } else {
-            "⚠ Báo đúng giờ: cần cấp quyền để nhắc sát phút hơn"
+            "✗ Báo đúng giờ: chưa cho phép, cảnh báo có thể bị trễ"
         }
         val syncStatus = EventStore.getLastSync(this).takeIf { it > 0L }?.let {
             "Sync gần nhất: ${timeFormatter.format(Instant.ofEpochMilli(it))}"
         } ?: "Chưa đồng bộ lần nào"
-        notificationHealthText.text = "$notificationStatus\n$batteryStatus\n$exactAlarmStatus\n$syncStatus\nMốc nhắc: ${EventStore.reminderOffsetsText(this)} trước hạn"
+        notificationHealthText.text = "$readyStatus\n$notificationStatus\n$batteryStatus\n$exactAlarmStatus\n$syncStatus\nMốc nhắc: ${EventStore.reminderOffsetsText(this)} trước hạn"
+    }
+
+    private fun isAlertSetupReady(): Boolean {
+        return NotificationHelper.canPostNotifications(this) &&
+            isIgnoringBatteryOptimizations() &&
+            ReminderScheduler.canScheduleExactAlarms(this)
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
@@ -946,17 +977,96 @@ class MainActivity : Activity() {
         return powerManager.isIgnoringBatteryOptimizations(packageName)
     }
 
+    private fun promptRequiredAlertSetupIfNeeded(force: Boolean) {
+        if (!force && setupPromptShown) return
+        if (isAlertSetupReady()) return
+        setupPromptShown = true
+
+        val missing = mutableListOf<String>()
+        if (!NotificationHelper.canPostNotifications(this)) {
+            missing += "• Bật quyền thông báo và kênh UTE Notice - Cảnh báo/Khẩn cấp"
+        }
+        if (!isIgnoringBatteryOptimizations()) {
+            missing += "• Đặt pin của app thành Không hạn chế / bỏ tối ưu pin"
+        }
+        if (!ReminderScheduler.canScheduleExactAlarms(this)) {
+            missing += "• Cho phép Báo đúng giờ / Alarms & reminders"
+        }
+
+        val nextAction = when {
+            !NotificationHelper.canPostNotifications(this) -> "Mở thông báo"
+            !isIgnoringBatteryOptimizations() -> "Mở cài đặt pin"
+            !ReminderScheduler.canScheduleExactAlarms(this) -> "Mở báo đúng giờ"
+            else -> "OK"
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Cần bật đủ quyền cảnh báo")
+            .setMessage("Để UTE Notice báo deadline ổn định khi tắt màn hình, cần hoàn tất:\n\n${missing.joinToString("\n")}\n\nNếu máy có mục Pin của ứng dụng, hãy chọn Không hạn chế.")
+            .setPositiveButton(nextAction) { _, _ ->
+                when {
+                    !NotificationHelper.canPostNotifications(this) -> openNotificationPermissionOrSettings()
+                    !isIgnoringBatteryOptimizations() -> openBatteryOptimizationSettings()
+                    !ReminderScheduler.canScheduleExactAlarms(this) -> openExactAlarmSettings()
+                }
+            }
+            .setNegativeButton("Để sau", null)
+            .show()
+    }
+
+    private fun openNotificationPermissionOrSettings() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            setupPromptShown = false
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+            return
+        }
+        setupPromptShown = false
+        openAppNotificationSettings()
+    }
+
+    private fun openAppNotificationSettings() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                setupPromptShown = false
+                startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                })
+            } else {
+                setupPromptShown = false
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            }
+        } catch (_: Exception) {
+            try {
+                setupPromptShown = false
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            } catch (_: Exception) {
+                Toast.makeText(this, "Không mở được cài đặt thông báo trên máy này.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun openBatteryOptimizationSettings() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
+                Toast.makeText(this, "Hãy chọn Cho phép / Không hạn chế pin cho UTE Notice.", Toast.LENGTH_LONG).show()
+                setupPromptShown = false
                 startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                     data = Uri.parse("package:$packageName")
                 })
             } else {
+                Toast.makeText(this, "App đã ở chế độ Không hạn chế pin hoặc Android không hỗ trợ mục này.", Toast.LENGTH_LONG).show()
+                setupPromptShown = false
                 startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             }
         } catch (_: Exception) {
             try {
+                Toast.makeText(this, "Vào Pin > UTE Notice > chọn Không hạn chế.", Toast.LENGTH_LONG).show()
+                setupPromptShown = false
                 startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.parse("package:$packageName")
                 })
@@ -973,6 +1083,7 @@ class MainActivity : Activity() {
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setupPromptShown = false
                 startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                     data = Uri.parse("package:$packageName")
                 })
@@ -1999,12 +2110,12 @@ class MainActivity : Activity() {
     }
 
     private fun updateNotificationChip() {
-        if (NotificationHelper.canPostNotifications(this)) {
-            notificationChip.text = "Thông báo sẵn sàng"
+        if (isAlertSetupReady()) {
+            notificationChip.text = "Cảnh báo sẵn sàng"
             notificationChip.setTextColor(Color.WHITE)
             notificationChip.background = rounded(Color.argb(45, 255, 255, 255), 8, Color.argb(90, 255, 255, 255), 1)
         } else {
-            notificationChip.text = "Chưa bật thông báo"
+            notificationChip.text = if (!isIgnoringBatteryOptimizations()) "Cần tắt tiết kiệm pin" else "Cần bật cảnh báo"
             notificationChip.setTextColor(Color.WHITE)
             notificationChip.background = rounded(red, 8)
         }

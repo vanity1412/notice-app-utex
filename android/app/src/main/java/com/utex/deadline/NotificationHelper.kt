@@ -152,9 +152,24 @@ object NotificationHelper {
     fun canPostNotifications(context: Context): Boolean {
         ensureChannel(context)
         val manager = NotificationManagerCompat.from(context)
-        return manager.areNotificationsEnabled() && (Build.VERSION.SDK_INT < 33 ||
+        val appPermissionOk = manager.areNotificationsEnabled() && (Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         )
+        return appPermissionOk && areDeadlineAlertChannelsEnabled(context)
+    }
+
+    fun areDeadlineAlertChannelsEnabled(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val alertOk = manager.getNotificationChannel(ALERT_CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
+        val criticalOk = manager.getNotificationChannel(CRITICAL_CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
+        return alertOk && criticalOk
+    }
+
+    private fun isChannelEnabled(context: Context, channelId: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return manager.getNotificationChannel(channelId)?.importance != NotificationManager.IMPORTANCE_NONE
     }
 
     fun hasUpcomingDailySummary(context: Context, events: List<DeadlineEvent>): Boolean {
@@ -216,11 +231,12 @@ object NotificationHelper {
                 "new" -> notifyNewDeadline(context, item.event)
                 "changed" -> notifyChangedDeadline(context, item.event)
                 "reminder" -> {
-                    if (item.event.startAtMillis <= now) {
+                    val deadlineAgeMillis = now - item.event.startAtMillis
+                    if (deadlineAgeMillis > 60L * 60_000L) {
                         true
                     } else {
                         val leadMinutes = item.leadMinutes
-                            ?: ((item.event.startAtMillis - now) / 60_000L).coerceAtLeast(1L)
+                            ?: ((item.event.startAtMillis - now) / 60_000L).coerceAtLeast(0L)
                         val leadText = item.leadText ?: EventStore.reminderLeadLabel(leadMinutes)
                         notifyReminder(context, item.event, leadText, leadMinutes)
                     }
@@ -266,6 +282,14 @@ object NotificationHelper {
         if (!canPostNotifications(context)) {
             return false
         }
+        val channelId = when {
+            useCriticalChannel -> CRITICAL_CHANNEL_ID
+            withSound -> ALERT_CHANNEL_ID
+            else -> SUMMARY_CHANNEL_ID
+        }
+        if (!isChannelEnabled(context, channelId)) {
+            return false
+        }
         val manager = NotificationManagerCompat.from(context)
         val intent = targetUrl
             ?.takeIf { it.isNotBlank() }
@@ -277,11 +301,6 @@ object NotificationHelper {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val channelId = when {
-            useCriticalChannel -> CRITICAL_CHANNEL_ID
-            withSound -> ALERT_CHANNEL_ID
-            else -> SUMMARY_CHANNEL_ID
-        }
         val notificationPriority = priority ?: if (withSound || useCriticalChannel) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW
         
         val builder = NotificationCompat.Builder(context, channelId)
@@ -290,6 +309,9 @@ object NotificationHelper {
             .setContentText(message.lineSequence().firstOrNull().orEmpty())
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(notificationPriority)
+            .setWhen(timestamp ?: System.currentTimeMillis())
+            .setShowWhen(true)
+            .setOnlyAlertOnce(false)
             .setAutoCancel(!ongoing)
             .setOngoing(ongoing)
             .setContentIntent(pendingIntent)
