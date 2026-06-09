@@ -113,7 +113,9 @@ object NotificationHelper {
     fun notifyReminder(context: Context, event: DeadlineEvent, leadText: String, leadMinutes: Long = 60L): Boolean {
         val priority = calculateReminderPriority(leadMinutes)
         val isCritical = leadMinutes <= 30L
-        val ongoing = leadMinutes <= 15L // Không thể vuốt bỏ nếu <= 15 phút
+        // FIXED: Cho phép người dùng dismiss notification bất kỳ lúc nào
+        // Thay vì chặn dismiss, ta chỉ dùng priority cao để thông báo nổi bật hơn
+        val ongoing = false // Luôn cho phép dismiss
         
         return show(
             context = context,

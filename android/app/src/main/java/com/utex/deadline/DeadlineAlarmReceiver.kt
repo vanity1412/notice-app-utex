@@ -57,6 +57,11 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
                 )
             )
         }
+        
+        // Gửi email reminder nếu được bật
+        if (EventStore.isEmailNotificationEnabled(context)) {
+            EmailNotificationService.sendReminderEmail(context, event, leadText) { _, _ -> }
+        }
     }
 
     private fun handleDailySummary(context: Context) {
@@ -81,6 +86,11 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
                         )
                     )
                 )
+            }
+            
+            // Gửi email daily summary nếu được bật
+            if (EventStore.isEmailNotificationEnabled(context)) {
+                EmailNotificationService.sendDailySummaryEmail(context, events) { _, _ -> }
             }
         }
         ReminderScheduler.scheduleDailySummary(context)

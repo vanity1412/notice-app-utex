@@ -224,6 +224,8 @@ class MainActivity : Activity() {
         tabContent.addView(quickGuidePanel())
         addSpacer(tabContent, 8)
         tabContent.addView(notificationSettingsPanel())
+        addSpacer(tabContent, 8)
+        tabContent.addView(emailNotificationPanel())
         addSpacer(tabContent, 16)
 
         refreshDailySummaryText()
@@ -718,6 +720,155 @@ class MainActivity : Activity() {
             topMargin = dp(8)
         })
         return panel
+    }
+
+    private fun emailNotificationPanel(): View {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = rounded(card, 8, line, 1)
+        }
+        
+        panel.addView(TextView(this).apply {
+            text = "Cảnh báo qua Email"
+            textSize = 15f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        
+        panel.addView(TextView(this).apply {
+            val emailStatus = if (EventStore.isEmailNotificationEnabled(this@MainActivity)) {
+                "Email cảnh báo đang bật cho: ${EventStore.getUserEmail(this@MainActivity)}"
+            } else if (EventStore.getUserEmail(this@MainActivity).isNotBlank()) {
+                "Email cảnh báo đang tắt. Email đã lưu: ${EventStore.getUserEmail(this@MainActivity)}"
+            } else {
+                "Nhập email của bạn để nhận thông báo deadline qua email."
+            }
+            text = emailStatus
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(8))
+        })
+        
+        // Email input field
+        val emailInput = EditText(this).apply {
+            hint = "Nhập email của bạn (ví dụ: student@hcmute.edu.vn)"
+            setSingleLine(true)
+            textSize = 13f
+            setTextColor(ink)
+            setHintTextColor(Color.rgb(148, 163, 184))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            background = rounded(Color.rgb(248, 250, 252), 8, Color.rgb(203, 213, 225), 1)
+            setText(EventStore.getUserEmail(this@MainActivity))
+        }
+        panel.addView(emailInput, LinearLayout.LayoutParams(match(), dp(44)).apply {
+            bottomMargin = dp(8)
+        })
+        
+        // Save and enable buttons
+        val actionRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        
+        actionRow.addView(primaryButton("Lưu email").apply {
+            setOnClickListener {
+                val email = emailInput.text.toString().trim()
+                if (email.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Hãy nhập email của bạn.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    Toast.makeText(this@MainActivity, "Email không hợp lệ.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                EventStore.setUserEmail(this@MainActivity, email)
+                Toast.makeText(this@MainActivity, "Đã lưu email.", Toast.LENGTH_SHORT).show()
+                showGuideTab()
+            }
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        
+        val toggleButton = if (EventStore.isEmailNotificationEnabled(this)) {
+            outlineButton("Tắt email").apply {
+                setOnClickListener {
+                    EventStore.setEmailNotificationEnabled(this@MainActivity, false)
+                    Toast.makeText(this@MainActivity, "Đã tắt thông báo email.", Toast.LENGTH_SHORT).show()
+                    showGuideTab()
+                }
+            }
+        } else {
+            secondaryButton("Bật email").apply {
+                setOnClickListener {
+                    if (EventStore.getUserEmail(this@MainActivity).isBlank()) {
+                        Toast.makeText(this@MainActivity, "Hãy lưu email trước.", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    EventStore.setEmailNotificationEnabled(this@MainActivity, true)
+                    Toast.makeText(this@MainActivity, "Đã bật thông báo email.", Toast.LENGTH_SHORT).show()
+                    showGuideTab()
+                }
+            }
+        }
+        
+        actionRow.addView(toggleButton, LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+            marginStart = dp(8)
+        })
+        
+        panel.addView(actionRow)
+        
+        // Test email button
+        addSpacer(panel, 8)
+        panel.addView(TextView(this).apply {
+            text = "Gửi email test để kiểm tra"
+            textSize = 12f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        })
+        
+        panel.addView(TextView(this).apply {
+            text = "Kiểm tra xem email có nhận được thông báo không. Email test sẽ được gửi ngay lập tức."
+            textSize = 11f
+            setTextColor(muted)
+            setPadding(0, dp(4), 0, dp(8))
+        })
+        
+        panel.addView(primaryButton("Gửi email test").apply {
+            setOnClickListener { sendTestEmail() }
+        }, LinearLayout.LayoutParams(match(), dp(42)))
+        
+        // Info về email notification
+        addSpacer(panel, 8)
+        panel.addView(TextView(this).apply {
+            text = "📧 Bạn sẽ nhận email khi:\n• Có deadline mới từ Moodle\n• Deadline sắp tới hạn (theo mốc nhắc đã cài)\n• Tổng hợp hàng ngày (nếu bật)"
+            textSize = 11f
+            setTextColor(blueDark)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = rounded(Color.rgb(231, 242, 255), 8, Color.rgb(190, 218, 248), 1)
+            setLineSpacing(0f, 1.2f)
+        })
+        
+        return panel
+    }
+
+    private fun sendTestEmail() {
+        val email = EventStore.getUserEmail(this)
+        if (email.isBlank()) {
+            Toast.makeText(this, "Hãy lưu email trước khi test.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        Toast.makeText(this, "Đang gửi email test...", Toast.LENGTH_SHORT).show()
+        
+        EmailNotificationService.sendTestEmail(this) { success, message ->
+            runOnUiThread {
+                if (success) {
+                    Toast.makeText(this, "✅ $message\nKiểm tra hộp thư của bạn.", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, "❌ $message", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun sendTestNotification() {

@@ -24,6 +24,8 @@ object EventStore {
     private const val KEY_CUSTOM_REMINDER_OFFSETS = "custom_reminder_offsets"
     private const val KEY_PENDING_NOTIFICATIONS = "pending_notifications_json"
     private const val KEY_SCHEDULED_REMINDER_ALARMS = "scheduled_reminder_alarms"
+    private const val KEY_USER_EMAIL = "user_email"
+    private const val KEY_EMAIL_NOTIFICATION_ENABLED = "email_notification_enabled"
     const val ALL_DAYS_MASK = 0b1111111
     private val DEFAULT_REMINDER_MINUTES = listOf(24L * 60L, 12L * 60L, 60L, 0L)
     private val PRESET_REMINDER_MINUTES = listOf(
@@ -400,6 +402,24 @@ object EventStore {
         return getReminderOffsetsMinutes(context)
             .joinToString(", ") { reminderOptionLabel(it) }
             .ifBlank { "1 giờ" }
+    }
+
+    // Email notification settings
+    fun getUserEmail(context: Context): String {
+        return prefs(context).getString(KEY_USER_EMAIL, "").orEmpty()
+    }
+
+    fun setUserEmail(context: Context, email: String) {
+        prefs(context).edit().putString(KEY_USER_EMAIL, email.trim()).apply()
+    }
+
+    fun isEmailNotificationEnabled(context: Context): Boolean {
+        return getUserEmail(context).isNotBlank() &&
+            prefs(context).getBoolean(KEY_EMAIL_NOTIFICATION_ENABLED, false)
+    }
+
+    fun setEmailNotificationEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_EMAIL_NOTIFICATION_ENABLED, enabled).apply()
     }
 
     private fun prefs(context: Context): SharedPreferences {

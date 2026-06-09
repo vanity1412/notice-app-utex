@@ -95,6 +95,11 @@ object DeadlineSync {
                                 )
                             }
                         }
+                        
+                        // Gửi email notification nếu được bật
+                        if (EventStore.isEmailNotificationEnabled(context)) {
+                            EmailNotificationService.sendNewDeadlineEmail(context, event) { _, _ -> }
+                        }
                     }
                     
                     changedEvents.forEach { event ->
