@@ -9,7 +9,7 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_REMINDER -> handleReminder(context.applicationContext, intent)
-            ACTION_DAILY_SUMMARY -> handleDailySummary(context.applicationContext)
+            ACTION_DAILY_SUMMARY -> handleDailySummary(context.applicationContext, intent)
         }
     }
 
@@ -72,11 +72,12 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         sendReminderEmailOnce(context, event, leadText, reminderKey)
     }
 
-    private fun handleDailySummary(context: Context) {
+    private fun handleDailySummary(context: Context, intent: Intent) {
         if (EventStore.isDailySummaryEnabled(context) && EventStore.isDailySummaryAllowedToday(context)) {
             val events = EventStore.loadEvents(context)
             if (NotificationHelper.hasUpcomingDailySummary(context, events)) {
-                val deliveryKey = dailySummaryDeliveryKey(context)
+                val minutesOfDay = intent.getIntExtra(EXTRA_DAILY_SUMMARY_MINUTES_OF_DAY, -1)
+                val deliveryKey = dailySummaryDeliveryKey(context, minutesOfDay)
 
                 if (EventStore.tryMarkNotificationDelivery(context, deliveryKey)) {
                     val sent = NotificationHelper.notifyDailySummary(context, events)
@@ -133,10 +134,16 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun dailySummaryDeliveryKey(context: Context): String {
+    private fun dailySummaryDeliveryKey(context: Context, minutesOfDay: Int): String {
         val date = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
-        val hour = EventStore.getDailySummaryHour(context)
-        val minute = EventStore.getDailySummaryMinute(context)
+        val safeMinutes = if (minutesOfDay in 0 until 24 * 60) {
+            minutesOfDay
+        } else {
+            EventStore.getDailySummaryTimes(context).firstOrNull()
+                ?: (EventStore.getDailySummaryHour(context) * 60 + EventStore.getDailySummaryMinute(context))
+        }
+        val hour = safeMinutes / 60
+        val minute = safeMinutes % 60
         return "daily-summary-$date-$hour-$minute"
     }
 
@@ -156,5 +163,6 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_LEAD_TEXT = "leadText"
         const val EXTRA_LEAD_MINUTES = "leadMinutes"
         const val EXTRA_REMINDER_KEY = "reminderKey"
+        const val EXTRA_DAILY_SUMMARY_MINUTES_OF_DAY = "dailySummaryMinutesOfDay"
     }
 }

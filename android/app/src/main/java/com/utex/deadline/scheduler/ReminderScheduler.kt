@@ -97,13 +97,21 @@ object ReminderScheduler {
             return
         }
 
-        val triggerAt = nextDailySummaryAtMillis(
-            hour = EventStore.getDailySummaryHour(appContext),
-            minute = EventStore.getDailySummaryMinute(appContext),
+        val times = EventStore.getDailySummaryTimes(appContext)
+        if (times.isEmpty()) {
+            return
+        }
+
+        val next = nextDailySummaryAtMillis(
+            timesOfDay = times,
             daysMask = EventStore.getDailySummaryDaysMask(appContext)
         )
-        dailySummaryPendingIntent(appContext, PendingIntent.FLAG_UPDATE_CURRENT)?.let {
-            setAlarm(appContext, triggerAt, it)
+        dailySummaryPendingIntent(
+            appContext,
+            PendingIntent.FLAG_UPDATE_CURRENT,
+            next.minutesOfDay
+        )?.let {
+            setAlarm(appContext, next.triggerAtMillis, it)
         }
     }
 
@@ -260,9 +268,14 @@ object ReminderScheduler {
         )
     }
 
-    private fun dailySummaryPendingIntent(context: Context, flags: Int): PendingIntent? {
+    private fun dailySummaryPendingIntent(
+        context: Context,
+        flags: Int,
+        minutesOfDay: Int = -1
+    ): PendingIntent? {
         val intent = Intent(context, DeadlineAlarmReceiver::class.java)
             .setAction(DeadlineAlarmReceiver.ACTION_DAILY_SUMMARY)
+            .putExtra(DeadlineAlarmReceiver.EXTRA_DAILY_SUMMARY_MINUTES_OF_DAY, minutesOfDay)
         return PendingIntent.getBroadcast(
             context,
             stableAlarmRequestCode(DAILY_SUMMARY_ALARM_KEY),
@@ -271,24 +284,35 @@ object ReminderScheduler {
         )
     }
 
-    private fun nextDailySummaryAtMillis(hour: Int, minute: Int, daysMask: Int): Long {
+    private fun nextDailySummaryAtMillis(timesOfDay: List<Int>, daysMask: Int): DailySummaryPlan {
         val now = ZonedDateTime.now(localZone)
-        val safeHour = hour.coerceIn(0, 23)
-        val safeMinute = minute.coerceIn(0, 59)
         val safeDays = daysMask and EventStore.ALL_DAYS_MASK
+        val safeTimes = timesOfDay
+            .filter { it in 0 until 24 * 60 }
+            .distinct()
+            .sorted()
+            .ifEmpty { listOf(6 * 60) }
 
-        for (offset in 0..7) {
-            val candidate = now.plusDays(offset.toLong())
-                .withHour(safeHour)
-                .withMinute(safeMinute)
-                .withSecond(0)
-                .withNano(0)
-            val dayBit = 1 shl (candidate.dayOfWeek.value - 1)
-            if (safeDays and dayBit != 0 && candidate.isAfter(now)) {
-                return candidate.toInstant().toEpochMilli()
+        for (dayOffset in 0..7) {
+            val date = now.plusDays(dayOffset.toLong()).toLocalDate()
+            val dayBit = 1 shl (date.dayOfWeek.value - 1)
+            if (safeDays and dayBit == 0) continue
+
+            safeTimes.forEach { minutes ->
+                val candidate = date
+                    .atTime(minutes / 60, minutes % 60)
+                    .atZone(localZone)
+                if (candidate.isAfter(now)) {
+                    return DailySummaryPlan(
+                        triggerAtMillis = candidate.toInstant().toEpochMilli(),
+                        minutesOfDay = minutes
+                    )
+                }
             }
         }
-        return now.plusDays(1).toInstant().toEpochMilli()
+
+        val fallback = now.plusDays(1).withHour(6).withMinute(0).withSecond(0).withNano(0)
+        return DailySummaryPlan(fallback.toInstant().toEpochMilli(), 6 * 60)
     }
 
     private fun stableAlarmRequestCode(text: String): Int {
@@ -298,6 +322,11 @@ object ReminderScheduler {
             ((digest[2].toInt() and 0xFF) shl 8) or
             (digest[3].toInt() and 0xFF)
     }
+
+    private data class DailySummaryPlan(
+        val triggerAtMillis: Long,
+        val minutesOfDay: Int
+    )
 
     private data class ReminderOffset(
         val label: String,

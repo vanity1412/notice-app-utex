@@ -77,12 +77,34 @@ internal fun MainActivity.notificationSettingsPanel(): View {
         }
         panel.addView(dailySummaryText)
 
+        panel.addView(TextView(this).apply {
+            text = "Khung giờ tổng hợp"
+            textSize = 12f
+            setTextColor(ink)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setPadding(0, dp(2), 0, dp(6))
+        })
+        val summaryTimes = EventStore.getDailySummaryTimes(this)
+        if (summaryTimes.isEmpty() || !EventStore.isDailySummaryEnabled(this)) {
+            panel.addView(TextView(this).apply {
+                text = "Chưa chọn khung giờ. Bấm + Thêm giờ để bật tổng hợp."
+                textSize = 11f
+                setTextColor(muted)
+                setPadding(0, 0, 0, dp(6))
+            })
+        } else {
+            summaryTimes.chunked(3).forEach { chunk ->
+                panel.addView(dailySummaryTimesRow(chunk))
+                addSpacer(panel, 6)
+            }
+        }
+
         val timeRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        timeRow.addView(primaryButton("Chọn giờ").apply {
-            setOnClickListener { showDailyTimePicker() }
+        timeRow.addView(primaryButton("+ Thêm giờ").apply {
+            setOnClickListener { showAddDailySummaryTimePicker() }
         }, LinearLayout.LayoutParams(0, dp(42), 1f))
         timeRow.addView(secondaryButton("Mỗi ngày").apply {
             setOnClickListener {
@@ -770,6 +792,54 @@ internal fun MainActivity.reminderNumberInput(): EditText {
         }
     }
 
+
+internal fun MainActivity.dailySummaryTimesRow(times: List<Int>): View {
+    val row = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+    }
+
+    times.forEachIndexed { index, minutes ->
+        row.addView(dailySummaryTimeButton(minutes), LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+            if (index > 0) marginStart = dp(6)
+        })
+    }
+    return row
+}
+
+internal fun MainActivity.dailySummaryTimeButton(minutes: Int): View {
+    val activity = this
+    val label = "%02d:%02d".format(minutes / 60, minutes % 60)
+
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = rounded(Color.rgb(232, 242, 255), 8, Color.rgb(178, 209, 245), 1)
+
+        addView(TextView(activity).apply {
+            text = label
+            textSize = 12f
+            setTextColor(blue)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(0, dp(38), 1f))
+
+        addView(TextView(activity).apply {
+            text = "✕"
+            textSize = 12f
+            setTextColor(red)
+            gravity = Gravity.CENTER
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            setOnClickListener {
+                EventStore.removeDailySummaryTime(activity, minutes)
+                ReminderScheduler.scheduleDailySummary(activity)
+                Toast.makeText(activity, "Đã xóa giờ tổng hợp $label.", Toast.LENGTH_SHORT).show()
+                showNotificationSettingsTab()
+            }
+        }, LinearLayout.LayoutParams(dp(34), dp(38)))
+    }
+}
+
 internal fun MainActivity.showAddCustomReminderDialog() {
         val dialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -860,27 +930,40 @@ internal fun MainActivity.showAddCustomReminderDialog() {
         dialog.show()
     }
 
-internal fun MainActivity.showDailyTimePicker() {
+internal fun MainActivity.showAddDailySummaryTimePicker() {
         TimePickerDialog(
             this,
             { _, hourOfDay, minute ->
-                EventStore.setDailySummaryTime(this, hourOfDay, minute)
+                val added = EventStore.addDailySummaryTime(this, hourOfDay, minute)
                 if (EventStore.getDailySummaryDaysMask(this) == 0) {
                     EventStore.setDailySummaryDaysMask(this, EventStore.ALL_DAYS_MASK)
                 }
                 ReminderScheduler.scheduleDailySummary(this)
+                Toast.makeText(
+                    this,
+                    if (added) {
+                        "Đã thêm giờ tổng hợp %02d:%02d.".format(hourOfDay, minute)
+                    } else {
+                        "Giờ này đã có hoặc đã đạt giới hạn 6 khung giờ."
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
                 showNotificationSettingsTab()
             },
-            EventStore.getDailySummaryHour(this),
-            EventStore.getDailySummaryMinute(this),
+            EventStore.getDailySummaryTimes(this).firstOrNull()?.div(60) ?: 6,
+            EventStore.getDailySummaryTimes(this).firstOrNull()?.rem(60) ?: 0,
             true
         ).show()
+    }
+
+internal fun MainActivity.showDailyTimePicker() {
+        showAddDailySummaryTimePicker()
     }
 
 internal fun MainActivity.refreshDailySummaryText() {
         if (!hasDailySummaryText()) return
         dailySummaryText.text = if (EventStore.isDailySummaryEnabled(this)) {
-            "App nhắc tổng hợp lúc ${summaryTimeText()} vào ${summaryDaysText()}."
+            "App nhắc tổng hợp lúc ${EventStore.dailySummaryTimesText(this)} vào ${summaryDaysText()}."
         } else {
             "Thông báo tổng hợp hằng ngày đang tắt. Nhắc trước hạn vẫn hoạt động."
         }

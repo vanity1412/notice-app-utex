@@ -51,6 +51,27 @@ object EmailNotificationService {
     }
 
     /**
+     * Gửi email khi giáo viên cập nhật deadline đã có trên Moodle
+     */
+    fun sendChangedDeadlineEmail(context: Context, event: DeadlineEvent, callback: (Boolean, String) -> Unit) {
+        val userEmail = EventStore.getUserEmail(context)
+        if (userEmail.isBlank()) {
+            callback(false, "Email chưa được cấu hình")
+            return
+        }
+
+        if (EventStore.isDone(context, event.id)) {
+            callback(true, "Deadline đã xong, không gửi email")
+            return
+        }
+
+        val subject = "🔄 Deadline đã thay đổi: ${EventLabels.kind(event)} - ${event.title}"
+        val message = buildEmailMessage(context, event, "Giáo viên đã cập nhật deadline trên Moodle")
+
+        sendEmailAsync(userEmail, subject, message, callback)
+    }
+
+    /**
      * Gửi email cảnh báo trước hạn
      */
     fun sendReminderEmail(context: Context, event: DeadlineEvent, leadText: String, callback: (Boolean, String) -> Unit) {

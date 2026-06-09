@@ -46,9 +46,11 @@ object DeadlineSync {
                 val previousMap = previousEvents.associateBy { it.id }
                 events.filter { event ->
                     event.id in knownIds && previousMap[event.id]?.let { old ->
-                        old.startAtMillis != event.startAtMillis || 
+                        old.startAtMillis != event.startAtMillis ||
                         old.title != event.title ||
-                        old.description != event.description
+                        old.description != event.description ||
+                        old.rawType != event.rawType ||
+                        old.sourceUrl != event.sourceUrl
                     } == true
                 }
             } else emptyList()
@@ -112,6 +114,11 @@ object DeadlineSync {
                                     timestamp = now
                                 )
                             }
+                        }
+
+                        // Gửi email khi giáo viên cập nhật deadline đã có trên Moodle
+                        if (EventStore.isEmailNotificationEnabled(context)) {
+                            EmailNotificationService.sendChangedDeadlineEmail(context, event) { _, _ -> }
                         }
                     }
                     

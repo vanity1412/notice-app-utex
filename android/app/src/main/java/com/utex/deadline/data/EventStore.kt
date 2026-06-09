@@ -18,8 +18,9 @@ object EventStore {
     private const val KEY_LAST_SYNC = "last_sync"
     private const val KEY_DAILY_SUMMARY_TOUCHED = "daily_summary_touched"
     private const val KEY_DAILY_SUMMARY_ENABLED = "daily_summary_enabled"
-    private const val KEY_DAILY_SUMMARY_HOUR = "daily_summary_hour"
-    private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute"
+    private const val KEY_DAILY_SUMMARY_HOUR = "daily_summary_hour" // Legacy: giữ để tương thích bản cũ
+    private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute" // Legacy: giữ để tương thích bản cũ
+    private const val KEY_DAILY_SUMMARY_TIMES = "daily_summary_times"
     private const val KEY_DAILY_SUMMARY_DAYS = "daily_summary_days"
     private const val KEY_DONE_IDS = "done_ids"
     private const val KEY_REMINDER_OFFSETS = "reminder_offsets"
@@ -44,6 +45,7 @@ object EventStore {
         15L,                 // 15 phút
         0L                   // Đúng lúc deadline
     )
+    private const val MAX_DAILY_SUMMARY_TIMES = 6
     private const val MAX_DELIVERED_NOTIFICATION_KEYS = 600
     @Volatile
     private var cachedPrefs: SharedPreferences? = null
@@ -98,10 +100,12 @@ object EventStore {
     fun prepareDailySummaryAfterSetup(context: Context) {
         val preferences = prefs(context)
         if (preferences.getBoolean(KEY_DAILY_SUMMARY_TOUCHED, false)) return
+        val defaultTime = getDailySummaryHour(context) * 60 + getDailySummaryMinute(context)
         preferences.edit()
             .putBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
-            .putInt(KEY_DAILY_SUMMARY_HOUR, getDailySummaryHour(context))
-            .putInt(KEY_DAILY_SUMMARY_MINUTE, getDailySummaryMinute(context))
+            .putString(KEY_DAILY_SUMMARY_TIMES, defaultTime.toString())
+            .putInt(KEY_DAILY_SUMMARY_HOUR, defaultTime / 60)
+            .putInt(KEY_DAILY_SUMMARY_MINUTE, defaultTime % 60)
             .putInt(KEY_DAILY_SUMMARY_DAYS, getDailySummaryDaysMask(context))
             .apply()
     }
@@ -115,12 +119,67 @@ object EventStore {
     }
 
     fun setDailySummaryTime(context: Context, hour: Int, minute: Int) {
-        prefs(context).edit()
+        val safeHour = hour.coerceIn(0, 23)
+        val safeMinute = minute.coerceIn(0, 59)
+        setDailySummaryTimes(context, listOf(safeHour * 60 + safeMinute))
+    }
+
+    fun getDailySummaryTimes(context: Context): List<Int> {
+        val saved = prefs(context).getString(KEY_DAILY_SUMMARY_TIMES, null)
+        val parsed = saved
+            ?.split(',')
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.filter { it in 0 until 24 * 60 }
+            ?.distinct()
+            ?.sorted()
+            .orEmpty()
+
+        if (parsed.isNotEmpty()) return parsed
+
+        // Tương thích dữ liệu cũ: app trước đây chỉ lưu 1 giờ/phút.
+        return listOf(getDailySummaryHour(context) * 60 + getDailySummaryMinute(context))
+    }
+
+    fun setDailySummaryTimes(context: Context, times: List<Int>) {
+        val safeTimes = times
+            .filter { it in 0 until 24 * 60 }
+            .distinct()
+            .sorted()
+            .take(MAX_DAILY_SUMMARY_TIMES)
+
+        val editor = prefs(context).edit()
             .putBoolean(KEY_DAILY_SUMMARY_TOUCHED, true)
-            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, true)
-            .putInt(KEY_DAILY_SUMMARY_HOUR, hour.coerceIn(0, 23))
-            .putInt(KEY_DAILY_SUMMARY_MINUTE, minute.coerceIn(0, 59))
-            .apply()
+            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, safeTimes.isNotEmpty())
+            .putString(KEY_DAILY_SUMMARY_TIMES, safeTimes.joinToString(","))
+
+        // Giữ legacy hour/minute để các bản cũ hoặc code cũ vẫn đọc được mốc đầu tiên.
+        safeTimes.firstOrNull()?.let { first ->
+            editor.putInt(KEY_DAILY_SUMMARY_HOUR, first / 60)
+                .putInt(KEY_DAILY_SUMMARY_MINUTE, first % 60)
+        }
+        editor.apply()
+    }
+
+    fun addDailySummaryTime(context: Context, hour: Int, minute: Int): Boolean {
+        val value = hour.coerceIn(0, 23) * 60 + minute.coerceIn(0, 59)
+        val current = getDailySummaryTimes(context).toMutableList()
+        if (value in current) return false
+        if (current.size >= MAX_DAILY_SUMMARY_TIMES) return false
+
+        current += value
+        setDailySummaryTimes(context, current)
+        return true
+    }
+
+    fun removeDailySummaryTime(context: Context, minutesOfDay: Int) {
+        val next = getDailySummaryTimes(context).filterNot { it == minutesOfDay }
+        setDailySummaryTimes(context, next)
+    }
+
+    fun dailySummaryTimesText(context: Context): String {
+        return getDailySummaryTimes(context)
+            .joinToString(", ") { minutes -> "%02d:%02d".format(minutes / 60, minutes % 60) }
+            .ifBlank { "chưa chọn giờ" }
     }
 
     fun getDailySummaryDaysMask(context: Context): Int {
@@ -574,6 +633,7 @@ object EventStore {
             KEY_DAILY_SUMMARY_TOUCHED,
             KEY_DAILY_SUMMARY_HOUR,
             KEY_DAILY_SUMMARY_MINUTE,
+            KEY_DAILY_SUMMARY_TIMES,
             KEY_DAILY_SUMMARY_DAYS,
             KEY_REMINDER_OFFSETS,
             KEY_CUSTOM_REMINDER_OFFSETS,
@@ -645,6 +705,7 @@ object EventStore {
             .remove(KEY_KNOWN_IDS)
             .remove(KEY_LAST_SYNC)
             .remove(KEY_DONE_IDS)
+            .remove(KEY_DAILY_SUMMARY_TIMES)
             .remove(KEY_CUSTOM_REMINDER_OFFSETS)
             .remove(KEY_PENDING_NOTIFICATIONS)
             .remove(KEY_SCHEDULED_REMINDER_ALARMS)

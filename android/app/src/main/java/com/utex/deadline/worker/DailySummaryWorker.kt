@@ -53,8 +53,13 @@ class DailySummaryWorker(appContext: Context, params: WorkerParameters) : Worker
 
     private fun dailySummaryDeliveryKey(): String {
         val date = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
-        val hour = EventStore.getDailySummaryHour(applicationContext)
-        val minute = EventStore.getDailySummaryMinute(applicationContext)
+        val now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        val currentMinutes = now.hour * 60 + now.minute
+        val configuredMinutes = EventStore.getDailySummaryTimes(applicationContext)
+            .minByOrNull { kotlin.math.abs(it - currentMinutes) }
+            ?: (EventStore.getDailySummaryHour(applicationContext) * 60 + EventStore.getDailySummaryMinute(applicationContext))
+        val hour = configuredMinutes / 60
+        val minute = configuredMinutes % 60
         return "daily-summary-$date-$hour-$minute"
     }
 
