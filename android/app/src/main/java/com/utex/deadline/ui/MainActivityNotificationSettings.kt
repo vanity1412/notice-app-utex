@@ -417,7 +417,7 @@ internal fun MainActivity.sendTestNotification() {
     }
 
 internal fun MainActivity.refreshNotificationHealthText() {
-        if (!::notificationHealthText.isInitialized) return
+        if (!hasNotificationHealthText()) return
         val readyStatus = if (isAlertSetupReady()) {
             "✓ Trạng thái cảnh báo: SẴN SÀNG"
         } else {
@@ -878,7 +878,7 @@ internal fun MainActivity.showDailyTimePicker() {
     }
 
 internal fun MainActivity.refreshDailySummaryText() {
-        if (!::dailySummaryText.isInitialized) return
+        if (!hasDailySummaryText()) return
         dailySummaryText.text = if (EventStore.isDailySummaryEnabled(this)) {
             "App nhắc tổng hợp lúc ${summaryTimeText()} vào ${summaryDaysText()}."
         } else {

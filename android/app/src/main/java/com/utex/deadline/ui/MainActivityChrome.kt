@@ -121,7 +121,7 @@ internal fun MainActivity.tabButton(text: String): TextView {
     }
 
 internal fun MainActivity.updateTabButtons() {
-        if (!::calendarTab.isInitialized || !::guideTab.isInitialized || !::notificationSettingsTab.isInitialized) return
+        if (!hasTabs()) return
         val tabs = listOf(
             calendarTab to ScreenTab.CALENDAR,
             guideTab to ScreenTab.GUIDE,

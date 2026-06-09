@@ -126,7 +126,7 @@ internal fun MainActivity.filterPanel(): View {
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
                 override fun afterTextChanged(s: Editable?) {
                     eventSearchText = s?.toString().orEmpty()
-                    if (::eventsContainer.isInitialized) refreshEventsList()
+                    if (hasEventsContainer()) refreshEventsList()
                 }
             })
         }
@@ -806,7 +806,7 @@ internal fun MainActivity.remainText(millis: Long): String {
         val hours = (diff / (60L * 60L * 1000L)) % 24
         val minutes = (diff / (60L * 1000L)) % 60
         return when {
-            days > 0 -> "Còn $days ngày $hours giờ"
+            days > 0 -> "Còn $days ngày $hours giờ $minutes phút"
             hours > 0 -> "Còn $hours giờ $minutes phút"
             else -> "Còn $minutes phút"
         }

@@ -25,4 +25,7 @@ internal enum class EventFilter(val label: String) {
         PERSONAL("Cá nhân")
     }
 
-internal data class DayOption(val label: String, val bitIndex: Int)
+internal data class DayOption(
+    val label: String,
+    val bitIndex: Int
+)

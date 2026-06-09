@@ -106,8 +106,8 @@ override fun onResume() {
         super.onResume()
         queueSyncIfStale()
         refreshScheduledNotifications()
-        if (::notificationChip.isInitialized) updateNotificationChip()
-        if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
+        if (hasNotificationChip()) updateNotificationChip()
+        if (hasNotificationHealthText()) refreshNotificationHealthText()
         NotificationHelper.flushPendingDeadlineNotifications(this)
         promptRequiredAlertSetupIfNeeded(force = false)
     }
@@ -121,8 +121,20 @@ override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out
             setupPromptShown = false
             promptRequiredAlertSetupIfNeeded(force = false)
         }
-        if (::notificationChip.isInitialized) updateNotificationChip()
-        if (::notificationHealthText.isInitialized) refreshNotificationHealthText()
+        if (hasNotificationChip()) updateNotificationChip()
+        if (hasNotificationHealthText()) refreshNotificationHealthText()
     }
+
+
+    internal fun hasNotificationChip(): Boolean = ::notificationChip.isInitialized
+
+    internal fun hasNotificationHealthText(): Boolean = ::notificationHealthText.isInitialized
+
+    internal fun hasDailySummaryText(): Boolean = ::dailySummaryText.isInitialized
+
+    internal fun hasEventsContainer(): Boolean = ::eventsContainer.isInitialized
+
+    internal fun hasTabs(): Boolean =
+        ::calendarTab.isInitialized && ::guideTab.isInitialized && ::notificationSettingsTab.isInitialized
 
 }
