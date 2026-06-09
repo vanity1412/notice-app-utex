@@ -1,925 +1,918 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UTE Notice - Ứng dụng theo dõi lịch Moodle HCMUTE</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="UTE Notice giúp sinh viên HCMUTE theo dõi lịch Moodle UTExLMS, nhắc deadline, kiểm tra, bài nộp và lịch thi ngay trên điện thoại." />
+    <meta name="theme-color" content="#00529c" />
+    <meta property="og:title" content="UTE Notice - Nhắc deadline Moodle HCMUTE" />
+    <meta property="og:description" content="Dán Calendar URL Moodle một lần, app tự đồng bộ và nhắc deadline trước hạn." />
+    <meta property="og:type" content="website" />
+    <title>UTE Notice - Nhắc deadline Moodle HCMUTE</title>
     <style>
+        :root {
+            --blue: #00529c;
+            --blue-dark: #00366f;
+            --red: #da2529;
+            --green: #188058;
+            --amber: #ca7400;
+            --ink: #172033;
+            --muted: #64748b;
+            --line: #dce5f0;
+            --page: #f4f7fb;
+            --card: #ffffff;
+            --soft-blue: #e7f2ff;
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+            --radius: 22px;
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #1e293b;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.25), transparent 34rem),
+                linear-gradient(135deg, #f6f9ff 0%, #edf5ff 42%, #fff 100%);
+            line-height: 1.65;
         }
 
-        .version-badge {
-            display: inline-block;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: 700;
-            margin-left: 8px;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        a {
+            color: inherit;
         }
 
         .container {
-            max-width: 1200px;
+            width: min(1120px, calc(100% - 32px));
             margin: 0 auto;
-            padding: 20px;
         }
 
-        .header {
-            text-align: center;
-            padding: 40px 20px;
-            color: white;
+        .nav {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            backdrop-filter: blur(18px);
+            background: rgba(255, 255, 255, 0.78);
+            border-bottom: 1px solid rgba(220, 229, 240, 0.75);
         }
 
-        .logo {
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 20px;
+        .nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 0;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            font-weight: 800;
+            color: var(--blue-dark);
+        }
+
+        .brand img {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
             background: white;
-            border-radius: 24px;
-            padding: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-        }
-
-        .logo img {
-            width: 100%;
-            height: 100%;
             object-fit: contain;
         }
 
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            font-weight: 700;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        .nav-links {
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            font-size: 0.95rem;
+            color: var(--muted);
         }
 
-        .subtitle {
-            font-size: 1.2em;
-            opacity: 0.95;
-            margin-bottom: 30px;
-        }
-
-        .download-btn {
-            display: inline-block;
-            background: #00529c;
-            color: white;
-            padding: 16px 48px;
-            border-radius: 12px;
+        .nav-links a {
             text-decoration: none;
-            font-size: 1.2em;
-            font-weight: 600;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
+            font-weight: 700;
         }
 
-        .download-btn:hover {
-            background: #00366f;
+        .nav-links a:hover {
+            color: var(--blue);
+        }
+
+        .hero {
+            padding: 70px 0 42px;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.94fr);
+            gap: 34px;
+            align-items: center;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            color: var(--blue-dark);
+            background: rgba(231, 242, 255, 0.95);
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 800;
+        }
+
+        h1 {
+            margin-top: 18px;
+            font-size: clamp(2.35rem, 7vw, 4.5rem);
+            line-height: 0.98;
+            letter-spacing: -0.055em;
+            color: #0f172a;
+        }
+
+        .hero p.lead {
+            margin-top: 20px;
+            max-width: 640px;
+            color: #475569;
+            font-size: clamp(1.06rem, 2.4vw, 1.28rem);
+        }
+
+        .highlight {
+            color: var(--blue);
+        }
+
+        .cta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 52px;
+            padding: 14px 20px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-weight: 800;
+            border: 1px solid transparent;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
         }
 
-        .download-btn:active {
-            transform: translateY(0);
+        .btn-primary {
+            color: white;
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            box-shadow: 0 14px 32px rgba(0, 82, 156, 0.24);
         }
 
-        .download-icon {
-            margin-right: 8px;
-        }
-
-        .main-content {
+        .btn-secondary {
+            color: var(--blue-dark);
             background: white;
-            border-radius: 16px;
-            padding: 40px;
-            margin: 20px 0;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-color: #cbd5e1;
+        }
+
+        .btn-android {
+            color: #063b20;
+            background: #3ddc84;
+            box-shadow: 0 12px 28px rgba(61, 220, 132, 0.28);
+        }
+
+        .mini-note {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .hero-card {
+            position: relative;
+            overflow: hidden;
+            padding: 22px;
+            background: rgba(255, 255, 255, 0.86);
+            border: 1px solid rgba(203, 213, 225, 0.8);
+            border-radius: 32px;
+            box-shadow: var(--shadow);
+        }
+
+        .phone-frame {
+            max-width: 350px;
+            margin: 0 auto;
+            padding: 12px;
+            background: #101827;
+            border-radius: 34px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.26);
+        }
+
+        .phone-frame img {
+            width: 100%;
+            display: block;
+            border-radius: 24px;
+            background: var(--page);
+        }
+
+        .hero-card .floating {
+            position: absolute;
+            left: 18px;
+            right: 18px;
+            bottom: 18px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .stat-pill {
+            padding: 10px 8px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(220, 229, 240, 0.9);
+            border-radius: 14px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .stat-pill strong {
+            display: block;
+            color: var(--blue-dark);
+            font-size: 1rem;
+            line-height: 1.1;
+        }
+
+        .stat-pill span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.76rem;
+            line-height: 1.2;
+            margin-top: 2px;
         }
 
         .section {
-            margin-bottom: 40px;
+            padding: 46px 0;
         }
 
-        .section h2 {
-            color: #00529c;
-            font-size: 1.8em;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #e2ebf7;
+        .section-title {
+            max-width: 720px;
+            margin-bottom: 22px;
         }
 
-        .features {
+        .section-title h2 {
+            font-size: clamp(1.8rem, 3.7vw, 2.6rem);
+            line-height: 1.08;
+            letter-spacing: -0.035em;
+        }
+
+        .section-title p {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 1.05rem;
+        }
+
+        .card-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .feature-card,
+        .download-card,
+        .step,
+        .notice-box,
+        .faq-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
         }
 
         .feature-card {
-            background: linear-gradient(135deg, #f4f7fb 0%, #e8f2ff 100%);
-            padding: 24px;
-            border-radius: 12px;
-            border-left: 4px solid #00529c;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            padding: 20px;
         }
 
-        .feature-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 20px rgba(0, 82, 156, 0.15);
+        .feature-card .icon {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            background: var(--soft-blue);
+            border-radius: 14px;
+            font-size: 1.35rem;
+            margin-bottom: 14px;
         }
 
         .feature-card h3 {
-            color: #00529c;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-            display: flex;
-            align-items: center;
-        }
-
-        .feature-icon {
-            margin-right: 10px;
-            font-size: 1.4em;
+            font-size: 1.08rem;
+            margin-bottom: 7px;
+            color: #0f172a;
         }
 
         .feature-card p {
-            color: #475569;
-            line-height: 1.6;
+            color: var(--muted);
+            font-size: 0.97rem;
+        }
+
+        .strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        .strip-item {
+            padding: 16px;
+            background: #0f172a;
+            color: white;
+            border-radius: 18px;
+        }
+
+        .strip-item strong {
+            display: block;
+            font-size: 1.35rem;
+        }
+
+        .strip-item span {
+            color: #cbd5e1;
+            font-size: 0.88rem;
         }
 
         .steps {
-            background: #f8fafc;
-            padding: 30px;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
         }
 
         .step {
-            display: flex;
-            margin-bottom: 20px;
-            align-items: flex-start;
+            padding: 20px;
         }
 
         .step-number {
-            background: #00529c;
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 14px;
             color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
+            background: var(--blue);
+            border-radius: 999px;
+            font-weight: 900;
+        }
+
+        .step h3 {
+            margin-bottom: 8px;
+        }
+
+        .step p,
+        .step li {
+            color: var(--muted);
+        }
+
+        .step ul {
+            padding-left: 18px;
+        }
+
+        code {
+            display: inline-block;
+            max-width: 100%;
+            padding: 2px 6px;
+            color: var(--blue-dark);
+            background: var(--soft-blue);
+            border-radius: 7px;
+            overflow-wrap: anywhere;
+        }
+
+        .download-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .download-card {
+            padding: 22px;
+        }
+
+        .download-card h3 {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            flex-shrink: 0;
-            margin-right: 16px;
+            gap: 10px;
+            font-size: 1.22rem;
         }
 
-        .step-content {
-            flex: 1;
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 9px;
+            border-radius: 999px;
+            color: white;
+            background: var(--green);
+            font-size: 0.76rem;
+            font-weight: 900;
         }
 
-        .step-content h4 {
-            color: #1e293b;
-            margin-bottom: 6px;
-            font-size: 1.1em;
+        .badge.beta {
+            background: #7c3aed;
         }
 
-        .step-content p {
-            color: #64748b;
+        .download-card p {
+            color: var(--muted);
+            margin: 10px 0 14px;
+        }
+
+        .file-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .file-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            color: var(--blue-dark);
+            background: var(--soft-blue);
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 800;
+        }
+
+        .media-grid {
+            display: grid;
+            grid-template-columns: 1.25fr 1fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .video-box,
+        .screenshots {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        .video-box video {
+            display: block;
+            width: 100%;
+            max-height: 620px;
+            background: #000;
         }
 
         .screenshots {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
         }
 
-        .screenshot {
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .screenshot:hover {
-            transform: scale(1.05);
-        }
-
-        .screenshot img {
+        .screenshots img {
             width: 100%;
-            height: auto;
-            display: block;
+            border-radius: 14px;
+            background: var(--page);
         }
 
-        .info-box {
-            background: #fef3c7;
-            border-left: 4px solid #f59e0b;
+        .notice-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .notice-box {
             padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
         }
 
-        .info-box.warning {
-            background: #fee2e2;
-            border-left-color: #dc2626;
+        .notice-box h3 {
+            margin-bottom: 8px;
         }
 
-        .info-box h3 {
-            color: #92400e;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
+        .notice-box p,
+        .notice-box li {
+            color: var(--muted);
         }
 
-        .info-box.warning h3 {
-            color: #991b1b;
+        .notice-box ul {
+            padding-left: 20px;
         }
 
-        .info-box p {
-            color: #78350f;
-            margin: 0;
+        .warning {
+            background: #fff7ed;
+            border-color: #fed7aa;
         }
 
-        .info-box.warning p {
-            color: #7f1d1d;
+        .security {
+            background: #fef2f2;
+            border-color: #fecaca;
         }
 
-        .contact {
-            text-align: center;
+        .faq {
+            display: grid;
+            gap: 12px;
+        }
+
+        details.faq-card {
+            padding: 16px 18px;
+        }
+
+        details summary {
+            cursor: pointer;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        details p {
+            margin-top: 8px;
+            color: var(--muted);
+        }
+
+        .bottom-cta {
+            margin: 40px 0 28px;
             padding: 30px;
-            background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%);
-            border-radius: 12px;
-            margin-top: 40px;
+            text-align: center;
+            color: white;
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            border-radius: 28px;
+            box-shadow: 0 20px 54px rgba(0, 82, 156, 0.22);
         }
 
-        .contact h3 {
-            color: #1e40af;
-            margin-bottom: 10px;
+        .bottom-cta h2 {
+            font-size: clamp(1.7rem, 3vw, 2.5rem);
+            line-height: 1.1;
         }
 
-        .contact p {
-            font-size: 1.1em;
-            color: #1e3a8a;
-            font-weight: 600;
+        .bottom-cta p {
+            margin: 10px 0 20px;
+            color: rgba(255, 255, 255, 0.86);
+        }
+
+        .bottom-cta .btn-secondary {
+            border-color: rgba(255, 255, 255, 0.35);
         }
 
         .footer {
+            padding: 28px 0 44px;
+            color: var(--muted);
             text-align: center;
-            padding: 30px 20px;
-            color: white;
-            opacity: 0.9;
+            font-size: 0.95rem;
         }
 
         .footer a {
-            color: white;
-            text-decoration: underline;
-            transition: opacity 0.3s;
-        }
-
-        .footer a:hover {
-            opacity: 0.8;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2em;
-            }
-
-            .main-content {
-                padding: 24px;
-            }
-
-            .features {
-                grid-template-columns: 1fr;
-            }
-
-            .download-btn {
-                padding: 14px 32px;
-                font-size: 1.1em;
-            }
-
-            .platform-buttons {
-                flex-direction: column;
-                width: 100%;
-            }
-
-            .platform-btn {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .sticky-download {
-                bottom: 12px;
-                right: 12px;
-            }
-
-            .fab-btn {
-                padding: 12px 20px;
-                font-size: 0.95em;
-            }
-        }
-
-        .badge {
-            display: inline-block;
-            background: #18805b;
-            color: white;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-
-        .badge.coming-soon {
-            background: #f59e0b;
-        }
-
-        .badge.beta {
-            background: #8b5cf6;
-        }
-
-        .download-section {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            align-items: center;
-            margin-top: 20px;
-        }
-
-        .platform-buttons {
-            display: flex;
-            gap: 16px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .platform-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            background: white;
-            color: #00529c;
-            padding: 16px 32px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-size: 1.1em;
-            font-weight: 600;
-            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            min-width: 200px;
-        }
-
-        .platform-btn.android {
-            background: #3ddc84;
-            color: white;
-            border-color: #3ddc84;
-        }
-
-        .platform-btn.ios {
-            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-            color: white;
-            border-color: #a855f7;
-        }
-
-        .platform-btn.ios-available {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-            border-color: #3b82f6;
-            cursor: pointer;
-        }
-
-        .platform-btn.android:hover {
-            background: #2ac470;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(61, 220, 132, 0.4);
-        }
-
-        .platform-btn.ios-available:hover {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4);
-        }
-
-        .platform-btn.ios:hover {
-            transform: none;
-        }
-
-        .zip-buttons {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .zip-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255, 255, 255, 0.95);
-            color: #1e293b;
-            padding: 12px 20px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-size: 0.95em;
-            font-weight: 600;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-
-        .zip-btn.android-zip {
-            border-color: #3ddc84;
-        }
-
-        .zip-btn.ios-zip {
-            border-color: #3b82f6;
-        }
-
-        .zip-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-            background: white;
-        }
-
-        .platform-icon {
-            font-size: 1.8em;
-        }
-
-        .platform-info {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
-        .platform-name {
-            font-size: 1.1em;
-            font-weight: 700;
-        }
-
-        .platform-status {
-            font-size: 0.8em;
-            opacity: 0.9;
+            color: var(--blue-dark);
+            font-weight: 800;
         }
 
         .sticky-download {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
+            right: 18px;
+            bottom: 18px;
+            z-index: 30;
             opacity: 0;
-            transform: translateY(100px);
-            transition: all 0.4s ease;
+            pointer-events: none;
+            transform: translateY(16px);
+            transition: all 0.22s ease;
         }
 
         .sticky-download.visible {
             opacity: 1;
+            pointer-events: auto;
             transform: translateY(0);
         }
 
-        .fab-btn {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: #3ddc84;
-            color: white;
-            padding: 16px 24px;
-            border-radius: 50px;
-            text-decoration: none;
-            font-weight: 600;
-            box-shadow: 0 4px 24px rgba(61, 220, 132, 0.4);
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
+        @media (max-width: 900px) {
+            .hero-grid,
+            .media-grid,
+            .download-panel,
+            .notice-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card-grid,
+            .steps,
+            .strip {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .nav-links {
+                display: none;
+            }
         }
 
-        .fab-btn:hover {
-            background: #2ac470;
-            transform: scale(1.05);
-            box-shadow: 0 6px 32px rgba(61, 220, 132, 0.5);
-        }
+        @media (max-width: 620px) {
+            .container {
+                width: min(100% - 22px, 1120px);
+            }
 
-        .fab-btn:active {
-            transform: scale(0.98);
-        }
+            .hero {
+                padding-top: 44px;
+            }
 
-        .bottom-download {
-            background: linear-gradient(135deg, #00529c 0%, #003d75 100%);
-            padding: 40px 20px;
-            border-radius: 16px;
-            text-align: center;
-            margin-top: 40px;
-            box-shadow: 0 8px 32px rgba(0, 82, 156, 0.2);
-        }
+            .card-grid,
+            .steps,
+            .strip,
+            .screenshots {
+                grid-template-columns: 1fr;
+            }
 
-        .bottom-download h2 {
-            color: white;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-        }
+            .hero-card .floating {
+                grid-template-columns: 1fr;
+                position: static;
+                margin-top: 12px;
+            }
 
-        .bottom-download p {
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 24px;
-            font-size: 1.1em;
-        }
+            .phone-frame {
+                max-width: 290px;
+            }
 
-        .ios-card {
-            background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
-            border: 2px solid #c7d2fe;
-            border-radius: 12px;
-            padding: 24px;
-            margin: 20px 0;
-            text-align: center;
-        }
+            .btn {
+                width: 100%;
+            }
 
-        .ios-card h3 {
-            color: #5b21b6;
-            font-size: 1.4em;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .ios-card p {
-            color: #6b21a8;
-            font-size: 1.05em;
-            margin: 10px 0;
-        }
-
-        .ios-card .feature-list {
-            text-align: left;
-            max-width: 500px;
-            margin: 20px auto;
-        }
-
-        .ios-card .feature-list li {
-            color: #6b21a8;
-        }
-
-        ul {
-            margin-left: 20px;
-            color: #475569;
-        }
-
-        ul li {
-            margin: 8px 0;
-            line-height: 1.6;
-        }
-
-        .video-container {
-            margin: 20px 0;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-            background: #000;
-        }
-
-        .video-container video {
-            width: 100%;
-            height: auto;
-            display: block;
-            max-height: 600px;
+            .sticky-download {
+                left: 12px;
+                right: 12px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/Logo_Tr%C6%B0%E1%BB%9Dng_%C4%90%E1%BA%A1i_H%E1%BB%8Dc_S%C6%B0_Ph%E1%BA%A1m_K%E1%BB%B9_Thu%E1%BA%ADt_TP_H%E1%BB%93_Ch%C3%AD_Minh.png" alt="HCMUTE Logo">
-            </div>
-            <h1>UTE Notice <span class="version-badge">v1.1</span></h1>
-            <p class="subtitle">Ứng dụng theo dõi lịch kiểm tra & deadline Moodle UTEx LMS</p>
-            
-            <div class="download-section">
-                <h3 style="color: white; margin-bottom: 20px; font-size: 1.4em;">📥 Tải xuống phiên bản 1.1</h3>
-                
-                <div class="platform-buttons">
-                    <a href="app version 1.1/UTE-Notice.apk" class="platform-btn android" download>
-                        <span class="platform-icon">🤖</span>
-                        <div class="platform-info">
-                            <span class="platform-name">Android APK</span>
-                            <span class="platform-status">Tải trực tiếp • v1.1</span>
-                        </div>
-                    </a>
-                    <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" class="platform-btn ios-available" download>
-                        <span class="platform-icon">🍎</span>
-                        <div class="platform-info">
-                            <span class="platform-name">iOS IPA</span>
-                            <span class="platform-status">Unsigned • v1.1</span>
-                        </div>
-                    </a>
-                </div>
-
-                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.3);">
-                    <p style="color: white; font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">📦 Tải gói đầy đủ (ZIP):</p>
-                    <div class="zip-buttons">
-                        <a href="app version 1.1/UTE-Notice-apk ver1.1.zip" class="zip-btn android-zip" download>
-                            <span>📦</span>
-                            <span>Android ZIP Package</span>
-                        </a>
-                        <a href="app version 1.1/UTE-Notice-ios ver 1.1.zip" class="zip-btn ios-zip" download>
-                            <span>📦</span>
-                            <span>iOS ZIP Package</span>
-                        </a>
-                        <a href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" class="zip-btn ios-zip" download>
-                            <span>📦</span>
-                            <span>iOS Unsigned App</span>
-                        </a>
-                    </div>
-                </div>
-
-                <p style="font-size: 0.95em; opacity: 0.85; margin-top: 16px; color: white;">
-                    ⚠️ iOS IPA cần Jailbreak hoặc ký lại để cài đặt | Android hỗ trợ 7.0+
-                </p>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="section">
-                <h2>📱 Hỗ trợ nền tảng</h2>
-                
-                <div class="feature-card" style="border-left-color: #3ddc84;">
-                    <h3><span class="feature-icon">🤖</span>Android <span class="badge">v1.1 Sẵn sàng</span></h3>
-                    <p><strong>Yêu cầu:</strong> Android 7.0 (Nougat) trở lên</p>
-                    <p><strong>Kích thước:</strong> ~8 MB</p>
-                    <p><strong>Tính năng:</strong> Đầy đủ tính năng, thông báo nền, đồng bộ tự động</p>
-                    <p style="margin-top: 12px;"><strong>Tải xuống:</strong></p>
-                    <ul style="margin-left: 20px; margin-top: 8px;">
-                        <li>📥 <a href="app version 1.1/UTE-Notice.apk" download style="color: #00529c; font-weight: 600;">APK trực tiếp (v1.1)</a></li>
-                        <li>📦 <a href="app version 1.1/UTE-Notice-apk ver1.1.zip" download style="color: #00529c; font-weight: 600;">ZIP Package</a></li>
-                    </ul>
-                </div>
-
-                <div class="feature-card" style="border-left-color: #3b82f6; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);">
-                    <h3><span class="feature-icon">🍎</span>iOS <span class="badge beta">v1.1 Beta</span></h3>
-                    <p><strong>Yêu cầu:</strong> iOS 14.0+ (iPhone 6s trở lên)</p>
-                    <p><strong>Kích thước:</strong> ~12 MB</p>
-                    <p><strong>Trạng thái:</strong> Phiên bản unsigned, cần ký lại hoặc Jailbreak</p>
-                    <p style="margin-top: 12px;"><strong>Tải xuống:</strong></p>
-                    <ul style="margin-left: 20px; margin-top: 8px;">
-                        <li>📥 <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" download style="color: #00529c; font-weight: 600;">IPA Unsigned (v1.1)</a></li>
-                        <li>📦 <a href="app version 1.1/UTE-Notice-ios ver 1.1.zip" download style="color: #00529c; font-weight: 600;">iOS ZIP Package</a></li>
-                        <li>📦 <a href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" download style="color: #00529c; font-weight: 600;">iOS Unsigned App ZIP</a></li>
-                    </ul>
-                    <div class="info-box" style="margin-top: 16px; background: #fef3c7; border-left-color: #f59e0b;">
-                        <p style="font-size: 0.9em; color: #78350f; margin: 0;">
-                            ⚠️ <strong>Lưu ý:</strong> File IPA chưa được ký chứng chỉ Apple. Bạn cần:
-                        </p>
-                        <ul style="margin-left: 20px; margin-top: 8px; color: #78350f; font-size: 0.9em;">
-                            <li>Sử dụng <strong>AltStore</strong>, <strong>Sideloadly</strong> hoặc <strong>Xcode</strong> để ký và cài</li>
-                            <li>Hoặc có thiết bị <strong>Jailbreak</strong></li>
-                            <li>Cần <strong>Apple ID</strong> để ký (miễn phí, tự ký được 7 ngày)</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>🎯 App có gì?</h2>
-                <div class="features">
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">🔗</span>Kết nối Moodle</h3>
-                        <p>Lưu Calendar URL từ Moodle an toàn, kiểm tra tính hợp lệ và che authtoken sau khi lưu.</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">🔄</span>Đồng bộ tự động</h3>
-                        <p>Tự động đồng bộ lịch nền mỗi 15 phút khi có mạng, không cần mở app.</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">📅</span>Hiển thị thân thiện</h3>
-                        <p>Deadline dạng thẻ dễ nhìn, có chế độ lịch tháng, tìm kiếm và lọc theo loại.</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">🔔</span>Thông báo thông minh</h3>
-                        <p>Nhắc trước hạn với các mốc có sẵn (7 ngày, 3 ngày, 2 ngày, 1 ngày, 12 giờ, 6 giờ, 3 giờ, 1 giờ, 30 phút) hoặc tự tùy chỉnh theo ngày/giờ/phút. Priority thông minh: càng gần hạn càng ưu tiên cao.</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">🆕</span>Phát hiện thay đổi</h3>
-                        <p>Thông báo khi có deadline mới hoặc giáo viên thay đổi lịch đã có.</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">📊</span>Tổng hợp hàng ngày</h3>
-                        <p>Nhận thông báo tổng hợp mỗi ngày lúc 6:00 (có thể tùy chỉnh giờ và ngày trong tuần).</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">✅</span>Quản lý deadline</h3>
-                        <p>Đánh dấu xong, ẩn deadline đã hoàn thành, mở Moodle và copy thông tin nhanh.</p>
-                    </div>
-                    <div class="feature-card">
-                        <h3><span class="feature-icon">🔒</span>Bảo mật</h3>
-                        <p>Lưu URL bằng EncryptedSharedPreferences, không lưu mật khẩu hay cookie Moodle.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>📖 Hướng dẫn sử dụng</h2>
-                <div class="steps">
-                    <div class="step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <h4>Tải và cài đặt</h4>
-                            <p><strong>Android:</strong> Tải file <a href="app version 1.1/UTE-Notice.apk" download style="color: #00529c; font-weight: 600;">UTE-Notice.apk (v1.1)</a> về điện thoại và cài đặt. Cấp quyền cài đặt từ nguồn không xác định nếu cần.</p>
-                            <p style="margin-top: 8px;"><strong>iOS:</strong> Tải file <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" download style="color: #00529c; font-weight: 600;">IPA (v1.1)</a> và ký lại bằng AltStore, Sideloadly hoặc Xcode.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <h4>Lấy Calendar URL từ Moodle</h4>
-                            <p>Truy cập <code>https://utexlms.hcmute.edu.vn/calendar/export.php</code>, chọn xuất "Tất cả sự kiện", khoảng thời gian "Mới đây và 60 ngày tới", sau đó bấm "Lấy địa chỉ mạng của lịch" và copy Calendar URL.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">3</div>
-                        <div class="step-content">
-                            <h4>Kết nối trong app</h4>
-                            <p>Mở app, dán Calendar URL vào ô kết nối (hoặc bấm "Dán clipboard"), sau đó bấm "Lưu & đồng bộ".</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">4</div>
-                        <div class="step-content">
-                            <h4>Cài đặt thông báo</h4>
-                            <p>Cấp quyền thông báo khi Android hỏi. Vào tab "Hướng dẫn" > "Cài đặt thông báo" để tùy chỉnh giờ, ngày và mốc nhắc trước hạn.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">5</div>
-                        <div class="step-content">
-                            <h4>Hoàn thành!</h4>
-                            <p>App sẽ tự động theo dõi và nhắc nhở bạn về các deadline sắp tới. Bấm "Xong" trên deadline đã hoàn thành để ẩn khỏi danh sách.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>🎬 Video demo</h2>
-                <div class="video-container">
-                    <video controls poster="image+video/1.jpg">
-                        <source src="image+video/demo.mp4" type="video/mp4">
-                        Trình duyệt của bạn không hỗ trợ video.
-                    </video>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>📱 Ảnh chụp màn hình</h2>
-                <div class="screenshots">
-                    <div class="screenshot">
-                        <img src="image+video/1.jpg" alt="Màn hình chính" onerror="this.parentElement.style.display='none'">
-                    </div>
-                    <div class="screenshot">
-                        <img src="image+video/2.jpg" alt="Danh sách deadline" onerror="this.parentElement.style.display='none'">
-                    </div>
-                    <div class="screenshot">
-                        <img src="image+video/3.jpg" alt="Cài đặt thông báo" onerror="this.parentElement.style.display='none'">
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>⚙️ Tính năng nổi bật</h2>
-                <ul>
-                    <li><strong>Phân loại thông minh:</strong> Tự động phân loại bài nộp, kiểm tra, thi và deadline thường</li>
-                    <li><strong>Tìm kiếm & lọc:</strong> Ô tìm kiếm và bộ lọc giúp xem nhanh loại deadline cần theo dõi</li>
-                    <li><strong>Chế độ xem linh hoạt:</strong> Chuyển đổi giữa chế độ danh sách và lịch tháng</li>
-                    <li><strong>Nhắc nhở tùy chỉnh:</strong> 9 mốc có sẵn (7 ngày → 30 phút) + thêm mốc tùy chỉnh theo ngày/giờ/phút bất kỳ</li>
-                    <li><strong>Priority thông minh:</strong> Deadline gần hạn (≤30 phút) có priority MAX, deadline xa hạn có priority thấp hơn</li>
-                    <li><strong>Thông báo tổng hợp:</strong> Chọn giờ và ngày trong tuần để nhận báo cáo tổng hợp</li>
-                    <li><strong>Kiểm tra sức khỏe:</strong> Nút test thông báo và mở cài đặt pin để đảm bảo hoạt động ổn định</li>
-                    <li><strong>Mở Moodle nhanh:</strong> Mỗi deadline có nút mở trực tiếp trên Moodle</li>
-                    <li><strong>Copy thông tin:</strong> Sao chép nhanh thông tin deadline để chia sẻ</li>
-                    <li><strong>Pending notifications:</strong> Thông báo không gửi được sẽ lưu lại và tự động gửi khi cấp quyền (timeout 3 ngày)</li>
-                </ul>
-            </div>
-
-            <div class="info-box warning">
-                <h3>⚠️ Lưu ý bảo mật</h3>
-                <p><strong>Calendar URL có chứa authtoken</strong> - ai có URL này có thể xem lịch Moodle của bạn. <strong>Không chia sẻ</strong> Calendar URL lên GitHub, Facebook, ảnh chụp công khai hoặc nhóm chat. Nếu lỡ lộ URL, hãy vào Moodle tạo lại link export mới. App chỉ lưu URL trong bộ nhớ local của điện thoại, không lưu mật khẩu hay cookie Moodle.</p>
-            </div>
-
-            <div class="info-box">
-                <h3>💡 Mẹo sử dụng</h3>
-                <p>Để nhận thông báo đầy đủ, hãy <strong>tắt tối ưu pin</strong> cho app UTE Notice trong cài đặt Android. Bấm nút "Cài đặt pin" trong tab Hướng dẫn để mở nhanh. Kiểm tra quyền thông báo nếu không nhận được thông báo.</p>
-            </div>
-
-            <div class="contact">
-                <h3>📞 Hỗ trợ & liên hệ</h3>
-                <p>VVT - 0968046024</p>
-                <p style="margin-top: 10px; font-size: 0.95em; font-weight: normal;">
-                    <a href="https://github.com/vanity1412/notice-app-utex" target="_blank">GitHub Repository</a>
-                </p>
-            </div>
-
-            <div class="bottom-download">
-                <h2>📥 Tải xuống UTE Notice v1.1</h2>
-                <p>Bắt đầu theo dõi deadline Moodle ngay hôm nay</p>
-                
-                <div style="margin: 24px 0;">
-                    <h3 style="color: white; font-size: 1.2em; margin-bottom: 16px;">Tải trực tiếp:</h3>
-                    <div class="platform-buttons">
-                        <a href="app version 1.1/UTE-Notice.apk" class="platform-btn android" download>
-                            <span class="platform-icon">🤖</span>
-                            <div class="platform-info">
-                                <span class="platform-name">Android APK</span>
-                                <span class="platform-status">~8 MB • Android 7.0+</span>
-                            </div>
-                        </a>
-                        <a href="app version 1.1/UTE-Notice-ios-unsigned.ipa" class="platform-btn ios-available" download>
-                            <span class="platform-icon">🍎</span>
-                            <div class="platform-info">
-                                <span class="platform-name">iOS IPA Unsigned</span>
-                                <span class="platform-status">~12 MB • iOS 14.0+</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-
-                <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid rgba(255,255,255,0.3);">
-                    <h3 style="color: white; font-size: 1.2em; margin-bottom: 16px;">📦 Tải gói ZIP đầy đủ:</h3>
-                    <div class="zip-buttons">
-                        <a href="app version 1.1/UTE-Notice-apk ver1.1.zip" class="zip-btn android-zip" download>
-                            <span>📦</span>
-                            <span>Android ZIP (v1.1)</span>
-                        </a>
-                        <a href="app version 1.1/UTE-Notice-ios ver 1.1.zip" class="zip-btn ios-zip" download>
-                            <span>📦</span>
-                            <span>iOS ZIP (v1.1)</span>
-                        </a>
-                        <a href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" class="zip-btn ios-zip" download>
-                            <span>📦</span>
-                            <span>iOS Unsigned App</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sticky floating download button -->
-        <div class="sticky-download" id="stickyDownload">
-            <a href="app version 1.1/UTE-Notice.apk" class="fab-btn" download>
-                <span>📥</span>
-                <span>Tải APK v1.1</span>
+    <nav class="nav" aria-label="Điều hướng nhanh">
+        <div class="container nav-inner">
+            <a class="brand" href="#top" aria-label="UTE Notice">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/Logo_Tr%C6%B0%E1%BB%9Dng_%C4%90%E1%BA%A1i_H%E1%BB%8Dc_S%C6%B0_Ph%E1%BA%A1m_K%E1%BB%B9_Thu%E1%BA%ADt_TP_H%E1%BB%93_Ch%C3%AD_Minh.png" alt="Logo HCMUTE" />
+                <span>UTE Notice</span>
             </a>
+            <div class="nav-links">
+                <a href="#features">Tính năng</a>
+                <a href="#guide">Cách dùng</a>
+                <a href="#download">Tải app</a>
+                <a href="#faq">FAQ</a>
+            </div>
         </div>
+    </nav>
 
-        <div class="footer">
-            <p>Phát triển cho sinh viên Trường Đại học Công Nghệ Kỹ thuật TP. Hồ Chí Minh</p>
-            <p style="margin-top: 8px; font-size: 0.9em;">
-                <a href="https://github.com/vanity1412/notice-app-utex" target="_blank">Xem mã nguồn trên GitHub</a>
-            </p>
-        </div>
+    <main id="top">
+        <section class="hero">
+            <div class="container hero-grid">
+                <div>
+                    <span class="eyebrow">🎓 Dành cho sinh viên HCMUTE • v1.1</span>
+                    <h1>Đừng bỏ lỡ <span class="highlight">deadline Moodle</span> nữa.</h1>
+                    <p class="lead">UTE Notice lấy lịch từ UTExLMS, tự đồng bộ nền và nhắc bạn khi có bài nộp, kiểm tra, lịch thi hoặc deadline sắp tới. Không cần nhập mật khẩu Moodle.</p>
+                    <div class="cta-row">
+                        <a class="btn btn-android" href="app version 1.1/UTE-Notice.apk" download>🤖 Tải APK Android v1.1</a>
+                        <a class="btn btn-secondary" href="#guide">📖 Xem cách lấy Calendar URL</a>
+                    </div>
+                    <p class="mini-note">Android 7.0+ • Lưu dữ liệu trên máy • Cần cấp quyền thông báo, pin và báo đúng giờ để nhắc ổn định.</p>
+                </div>
+
+                <div class="hero-card" aria-label="Ảnh minh họa ứng dụng">
+                    <div class="phone-frame">
+                        <img src="image+video/1.jpg" alt="Màn hình chính UTE Notice" onerror="this.src='image+video/2.jpg'; this.onerror=null;" />
+                    </div>
+                    <div class="floating" aria-hidden="true">
+                        <div class="stat-pill"><strong>5 phút</strong><span>kiểm tra nền</span></div>
+                        <div class="stat-pill"><strong>11 mốc</strong><span>nhắc có sẵn</span></div>
+                        <div class="stat-pill"><strong>Local</strong><span>không lưu mật khẩu</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="features">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Đúng trọng tâm: mở app ít hơn, vẫn biết việc cần làm.</h2>
+                    <p>Trang này đã gom lại theo các chức năng thực sự đang có trong app: kết nối Moodle, đồng bộ, cảnh báo, lịch xem nhanh và deadline cá nhân.</p>
+                </div>
+
+                <div class="card-grid">
+                    <article class="feature-card">
+                        <div class="icon">🔗</div>
+                        <h3>Kết nối Moodle an toàn</h3>
+                        <p>Dán Calendar URL dạng <code>export_execute.php</code>, app kiểm tra đúng host UTExLMS và che authtoken sau khi lưu.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">🔄</div>
+                        <h3>Tự đồng bộ khi có mạng</h3>
+                        <p>App tự kiểm tra lịch Moodle khoảng mỗi 5 phút, phát hiện deadline mới hoặc lịch bị giáo viên sửa.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">🔔</div>
+                        <h3>Nhắc trước hạn linh hoạt</h3>
+                        <p>Chọn mốc 7 ngày, 3 ngày, 2 ngày, 1 ngày, 12 giờ, 6 giờ, 3 giờ, 1 giờ, 30 phút, 15 phút hoặc đúng lúc deadline.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">🚨</div>
+                        <h3>Cảnh báo gấp nổi bật</h3>
+                        <p>Deadline còn rất ít thời gian được đưa vào kênh khẩn cấp, có âm thanh/rung và mức ưu tiên cao.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">📋</div>
+                        <h3>Tổng hợp hằng ngày</h3>
+                        <p>Chọn giờ và ngày trong tuần để app báo danh sách deadline sắp tới, mặc định phù hợp nhu cầu xem nhanh buổi sáng.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">✅</div>
+                        <h3>Đánh dấu xong</h3>
+                        <p>Bài đã làm có thể đánh dấu xong để ẩn khỏi danh sách và không bị nhắc lại.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">🔎</div>
+                        <h3>Tìm kiếm & lọc</h3>
+                        <p>Tìm theo tên bài/môn, lọc bài nộp, kiểm tra, thi, deadline cá nhân và xem dạng danh sách hoặc lịch tháng.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">➕</div>
+                        <h3>Thêm deadline cá nhân</h3>
+                        <p>Không chỉ Moodle: bạn có thể thêm việc riêng, sửa/xóa deadline cá nhân và vẫn dùng chung hệ thống nhắc.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="icon">🛠️</div>
+                        <h3>Kiểm tra trạng thái cảnh báo</h3>
+                        <p>App có nút test thông báo, mở nhanh cài đặt thông báo Android, tối ưu pin và quyền báo đúng giờ.</p>
+                    </article>
+                </div>
+
+                <div class="strip" aria-label="Tóm tắt nhanh">
+                    <div class="strip-item"><strong>Không mật khẩu</strong><span>chỉ dùng Calendar URL Moodle</span></div>
+                    <div class="strip-item"><strong>Nhắc nền</strong><span>AlarmManager + WorkManager dự phòng</span></div>
+                    <div class="strip-item"><strong>Offline local</strong><span>deadline đã đồng bộ lưu trên máy</span></div>
+                    <div class="strip-item"><strong>HCMUTE</strong><span>tối ưu cho UTExLMS</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="guide">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Cách dùng trong 3 bước</h2>
+                    <p>Sinh viên chỉ cần lấy đúng Calendar URL từ Moodle một lần, sau đó app tự theo dõi.</p>
+                </div>
+
+                <div class="steps">
+                    <article class="step">
+                        <div class="step-number">1</div>
+                        <h3>Tải và cấp quyền</h3>
+                        <p>Cài APK Android, mở app rồi cấp quyền thông báo. Trong cài đặt Android nên đặt pin của app thành “Không hạn chế”.</p>
+                    </article>
+                    <article class="step">
+                        <div class="step-number">2</div>
+                        <h3>Lấy Calendar URL Moodle</h3>
+                        <p>Vào <code>https://utexlms.hcmute.edu.vn/calendar/export.php</code>, chọn “Tất cả sự kiện” và bấm “Lấy địa chỉ mạng của lịch”.</p>
+                    </article>
+                    <article class="step">
+                        <div class="step-number">3</div>
+                        <h3>Dán vào app</h3>
+                        <p>Dán link có dạng <code>/calendar/export_execute.php</code>, bấm “Lưu & đồng bộ”, sau đó chọn các mốc nhắc phù hợp.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="media">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Xem nhanh giao diện</h2>
+                    <p>Ưu tiên màn hình lịch, trạng thái cảnh báo và thao tác nhanh cho deadline.</p>
+                </div>
+                <div class="media-grid">
+                    <div class="video-box">
+                        <video controls preload="metadata" poster="image+video/1.jpg">
+                            <source src="image+video/demo.mp4" type="video/mp4" />
+                            Trình duyệt của bạn không hỗ trợ video.
+                        </video>
+                    </div>
+                    <div class="screenshots">
+                        <img src="image+video/1.jpg" alt="Màn hình chính" loading="lazy" onerror="this.style.display='none'" />
+                        <img src="image+video/2.jpg" alt="lịch" loading="lazy" onerror="this.style.display='none'" />
+                        <img src="image+video/3.jpg" alt="Cài đặt thông báo" loading="lazy" onerror="this.style.display='none'" />
+                        <img src="image+video/4.jpg" alt="Cài đặt thông báo" loading="lazy" onerror="this.style.display='none'" />
+                        <img src="image+video/5.jpg" alt="email" loading="lazy" onerror="this.style.display='none'" />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="download">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Tải xuống UTE Notice v1.1</h2>
+                    <p>Khuyến nghị dùng bản Android APK. Bản iOS unsigned chỉ dành cho người biết ký IPA hoặc thiết bị Jailbreak.</p>
+                </div>
+
+                <div class="download-panel">
+                    <article class="download-card">
+                        <h3>🤖 Android <span class="badge">Khuyên dùng</span></h3>
+                        <p>Hỗ trợ Android 7.0 trở lên, đầy đủ thông báo nền, đồng bộ tự động và cảnh báo đúng giờ.</p>
+                        <div class="file-links">
+                            <a class="file-link" href="app version 1.1/UTE-Notice.apk" download>📥 APK v1.1</a>
+                            <a class="file-link" href="app version 1.1/UTE-Notice-apk ver1.1.zip" download>📦 Android ZIP</a>
+                        </div>
+                    </article>
+
+                    <article class="download-card">
+                        <h3>🍎 iOS <span class="badge beta">Unsigned</span></h3>
+                        <p>File IPA chưa ký chứng chỉ Apple. Cần AltStore, Sideloadly, Xcode hoặc thiết bị Jailbreak để cài.</p>
+                        <div class="file-links">
+                            <a class="file-link" href="app version 1.1/UTE-Notice-ios-unsigned.ipa" download>📥 IPA unsigned</a>
+                            <a class="file-link" href="app version 1.1/UTE-Notice-ios ver 1.1.zip" download>📦 iOS ZIP</a>
+                            <a class="file-link" href="app version 1.1/UTE-Notice-ios-unsigned-app.zip" download>📦 Unsigned App ZIP</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="container notice-grid">
+                <article class="notice-box warning">
+                    <h3>💡 Để thông báo ổn định</h3>
+                    <ul>
+                        <li>Bật quyền thông báo cho UTE Notice.</li>
+                        <li>Đặt pin của app thành “Không hạn chế”.</li>
+                        <li>Cho phép “Báo đúng giờ / Alarms & reminders” trên Android 12+.</li>
+                        <li>Dùng nút “Gửi test” trong app để kiểm tra ngay.</li>
+                    </ul>
+                </article>
+                <article class="notice-box security">
+                    <h3>⚠️ Lưu ý bảo mật Calendar URL</h3>
+                    <p>Calendar URL có chứa <strong>authtoken</strong>. Không đăng link này lên GitHub, Facebook, ảnh chụp công khai hoặc nhóm chat. Nếu lỡ lộ URL, hãy vào Moodle tạo lại link xuất lịch mới.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section" id="faq">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Câu hỏi thường gặp</h2>
+                </div>
+                <div class="faq">
+                    <details class="faq-card">
+                        <summary>App có cần tài khoản/mật khẩu Moodle không?</summary>
+                        <p>Không. App chỉ cần Calendar URL được Moodle tạo sẵn. URL này vẫn nhạy cảm vì có authtoken, nên không chia sẻ công khai.</p>
+                    </details>
+                    <details class="faq-card">
+                        <summary>Vì sao đã cài app nhưng chưa thấy deadline?</summary>
+                        <p>Thường là do dán nhầm trang <code>export.php</code> thay vì link <code>export_execute.php</code>, chọn sai phạm vi lịch, hoặc lịch Moodle hiện chưa có deadline trong khoảng đã xuất.</p>
+                    </details>
+                    <details class="faq-card">
+                        <summary>Vì sao thông báo có thể bị trễ?</summary>
+                        <p>Một số máy Android chặn app chạy nền để tiết kiệm pin. Hãy bật quyền thông báo, bỏ tối ưu pin và cho phép báo đúng giờ trong cài đặt Android.</p>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section class="container bottom-cta">
+            <h2>Bắt đầu theo dõi deadline Moodle ngay hôm nay</h2>
+            <p>Dán Calendar URL một lần, phần còn lại để UTE Notice nhắc bạn.</p>
+            <div class="cta-row" style="justify-content:center; margin-top: 0;">
+                <a class="btn btn-android" href="app version 1.1/UTE-Notice.apk" download>🤖 Tải APK v1.1</a>
+                <a class="btn btn-secondary" href="https://github.com/vanity1412/notice-app-utex" target="_blank" rel="noopener">GitHub Repository</a>
+            </div>
+        </section>
+    </main>
+
+    <div class="sticky-download" id="stickyDownload">
+        <a class="btn btn-primary" href="app version 1.1/UTE-Notice.apk" download>📥 Tải APK</a>
     </div>
 
+    <footer class="footer">
+        <div class="container">
+            <p>Phát triển cho sinh viên Trường Đại học Sư phạm Kỹ thuật TP. Hồ Chí Minh.</p>
+            <p>Hỗ trợ: Vũ Văn Thông - 0968046024 · <a href="https://github.com/vanity1412/notice-app-utex" target="_blank" rel="noopener">Xem mã nguồn trên GitHub</a></p>
+        </div>
+    </footer>
+
     <script>
-        // Sticky download button logic
         const stickyDownload = document.getElementById('stickyDownload');
-        const header = document.querySelector('.header');
-        
+        const hero = document.querySelector('.hero');
+
         function handleScroll() {
-            // Show sticky button when scrolled past header
-            const headerBottom = header.offsetTop + header.offsetHeight;
-            const scrolled = window.scrollY;
-            
-            if (scrolled > headerBottom + 100) {
-                stickyDownload.classList.add('visible');
-            } else {
-                stickyDownload.classList.remove('visible');
-            }
+            const heroBottom = hero.offsetTop + hero.offsetHeight;
+            stickyDownload.classList.toggle('visible', window.scrollY > heroBottom);
         }
-        
-        // Throttle scroll event for performance
+
         let ticking = false;
-        window.addEventListener('scroll', function() {
+        window.addEventListener('scroll', () => {
             if (!ticking) {
-                window.requestAnimationFrame(function() {
+                window.requestAnimationFrame(() => {
                     handleScroll();
                     ticking = false;
                 });
                 ticking = true;
             }
-        });
-        
-        // Initial check
+        }, { passive: true });
+
         handleScroll();
     </script>
 </body>
