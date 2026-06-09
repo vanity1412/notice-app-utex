@@ -6,12 +6,14 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 
 object EventStore {
     private const val PREFS = "ute_deadline_secure_prefs"
     private const val LEGACY_PREFS = "ute_deadline_prefs"
     private const val KEY_ICAL_URL = "ical_url"
-    private const val KEY_EVENTS = "events_json"
+    private const val KEY_EVENTS = "events_json" // Moodle read-only events
+    private const val KEY_PERSONAL_EVENTS = "personal_events_json"
     private const val KEY_KNOWN_IDS = "known_ids"
     private const val KEY_LAST_SYNC = "last_sync"
     private const val KEY_DAILY_SUMMARY_TOUCHED = "daily_summary_touched"
@@ -46,7 +48,9 @@ object EventStore {
     @Volatile
     private var cachedPrefs: SharedPreferences? = null
     @Volatile
-    private var cachedEvents: List<DeadlineEvent>? = null
+    private var cachedMoodleEvents: List<DeadlineEvent>? = null
+    @Volatile
+    private var cachedPersonalEvents: List<DeadlineEvent>? = null
     @Volatile
     private var cachedDoneIds: Set<String>? = null
 
@@ -64,15 +68,11 @@ object EventStore {
             .remove(KEY_EVENTS)
             .remove(KEY_KNOWN_IDS)
             .remove(KEY_LAST_SYNC)
-            .remove(KEY_DAILY_SUMMARY_TOUCHED)
-            .remove(KEY_DONE_IDS)
             .remove(KEY_PENDING_NOTIFICATIONS)
             .remove(KEY_SCHEDULED_REMINDER_ALARMS)
             .remove(KEY_DELIVERED_NOTIFICATION_KEYS)
-            .putBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
             .apply()
-        cachedEvents = emptyList()
-        cachedDoneIds = emptySet()
+        cachedMoodleEvents = emptyList()
         clearLegacyConnection(context)
     }
 
@@ -85,9 +85,7 @@ object EventStore {
     }
 
     fun isDailySummaryEnabled(context: Context): Boolean {
-        val preferences = prefs(context)
-        return preferences.getString(KEY_ICAL_URL, "").orEmpty().isNotBlank() &&
-            preferences.getBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
+        return prefs(context).getBoolean(KEY_DAILY_SUMMARY_ENABLED, false)
     }
 
     fun setDailySummaryEnabled(context: Context, enabled: Boolean) {
@@ -144,47 +142,116 @@ object EventStore {
         return getDailySummaryDaysMask(context) and bit != 0
     }
 
-    fun loadEvents(context: Context): List<DeadlineEvent> {
-        cachedEvents?.let { return it }
+    /**
+     * Danh sách dùng cho UI, nhắc lịch, tổng hợp: Moodle read-only + deadline cá nhân editable.
+     */
+    fun loadEvents(context: Context): List<DeadlineEvent> = loadAllEvents(context)
+
+    fun loadAllEvents(context: Context): List<DeadlineEvent> {
+        return (loadMoodleEvents(context) + loadPersonalEvents(context))
+            .distinctBy { it.id }
+            .sortedBy { it.startAtMillis }
+    }
+
+    /**
+     * Chỉ deadline lấy từ Moodle. Người dùng không được sửa trực tiếp danh sách này.
+     */
+    fun loadMoodleEvents(context: Context): List<DeadlineEvent> {
+        cachedMoodleEvents?.let { return it }
         val json = prefs(context).getString(KEY_EVENTS, "[]").orEmpty()
+        return parseEventsJson(json, DeadlineSource.MOODLE).also {
+            cachedMoodleEvents = it
+        }
+    }
+
+    fun saveMoodleEvents(context: Context, events: List<DeadlineEvent>) {
+        val sortedEvents = events
+            .map { it.copy(source = DeadlineSource.MOODLE) }
+            .sortedBy { it.startAtMillis }
+        prefs(context).edit().putString(KEY_EVENTS, eventsToJson(sortedEvents).toString()).apply()
+        cachedMoodleEvents = sortedEvents
+        clearDoneForMissingEvents(context, (sortedEvents + loadPersonalEvents(context)).map { it.id }.toSet())
+    }
+
+    /**
+     * Tương thích với code cũ: saveEvents hiện chỉ dùng cho Moodle sync.
+     */
+    fun saveEvents(context: Context, events: List<DeadlineEvent>) = saveMoodleEvents(context, events)
+
+    fun loadPersonalEvents(context: Context): List<DeadlineEvent> {
+        cachedPersonalEvents?.let { return it }
+        val json = prefs(context).getString(KEY_PERSONAL_EVENTS, "[]").orEmpty()
+        return parseEventsJson(json, DeadlineSource.PERSONAL).also {
+            cachedPersonalEvents = it
+        }
+    }
+
+    fun savePersonalEvents(context: Context, events: List<DeadlineEvent>) {
+        val sortedEvents = events
+            .map { it.copy(source = DeadlineSource.PERSONAL, sourceUrl = null) }
+            .sortedBy { it.startAtMillis }
+        prefs(context).edit().putString(KEY_PERSONAL_EVENTS, eventsToJson(sortedEvents).toString()).apply()
+        cachedPersonalEvents = sortedEvents
+        clearDoneForMissingEvents(context, (loadMoodleEvents(context) + sortedEvents).map { it.id }.toSet())
+    }
+
+    fun createPersonalEvent(
+        context: Context,
+        title: String,
+        startAtMillis: Long,
+        description: String? = null,
+        rawType: String? = "Cá nhân"
+    ): DeadlineEvent {
+        val event = DeadlineEvent(
+            id = "personal-${UUID.randomUUID()}",
+            title = title.trim(),
+            startAtMillis = startAtMillis,
+            sourceUrl = null,
+            rawType = rawType?.trim()?.takeIf { it.isNotBlank() } ?: "Cá nhân",
+            description = description?.trim()?.takeIf { it.isNotBlank() },
+            source = DeadlineSource.PERSONAL
+        )
+        upsertPersonalEvent(context, event)
+        return event
+    }
+
+    fun upsertPersonalEvent(context: Context, event: DeadlineEvent) {
+        val personalEvent = event.copy(source = DeadlineSource.PERSONAL, sourceUrl = null)
+        val next = loadPersonalEvents(context)
+            .filterNot { it.id == personalEvent.id }
+            .plus(personalEvent)
+            .sortedBy { it.startAtMillis }
+        savePersonalEvents(context, next)
+    }
+
+    fun deletePersonalEvent(context: Context, eventId: String) {
+        val next = loadPersonalEvents(context).filterNot { it.id == eventId }
+        savePersonalEvents(context, next)
+        setDone(context, eventId, false)
+    }
+
+    fun isEditablePersonalEvent(context: Context, eventId: String): Boolean {
+        return loadPersonalEvents(context).any { it.id == eventId }
+    }
+
+    private fun parseEventsJson(json: String, defaultSource: DeadlineSource): List<DeadlineEvent> {
         return try {
             val arr = JSONArray(json)
             (0 until arr.length()).mapNotNull { i ->
                 val obj = arr.optJSONObject(i) ?: return@mapNotNull null
-                DeadlineEvent(
-                    id = obj.optString("id"),
-                    title = obj.optString("title"),
-                    startAtMillis = obj.optLong("startAtMillis"),
-                    sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() },
-                    rawType = obj.optString("rawType").takeIf { it.isNotBlank() },
-                    description = obj.optString("description").takeIf { it.isNotBlank() }
-                )
-            }.sortedBy { it.startAtMillis }.also {
-                cachedEvents = it
-            }
+                eventFromJson(obj, defaultSource)
+            }.sortedBy { it.startAtMillis }
         } catch (_: Exception) {
-            emptyList<DeadlineEvent>().also {
-                cachedEvents = it
-            }
+            emptyList()
         }
     }
 
-    fun saveEvents(context: Context, events: List<DeadlineEvent>) {
+    private fun eventsToJson(events: List<DeadlineEvent>): JSONArray {
         val arr = JSONArray()
-        val sortedEvents = events.sortedBy { it.startAtMillis }
-        sortedEvents.forEach { event ->
-            arr.put(JSONObject().apply {
-                put("id", event.id)
-                put("title", event.title)
-                put("startAtMillis", event.startAtMillis)
-                put("sourceUrl", event.sourceUrl ?: "")
-                put("rawType", event.rawType ?: "")
-                put("description", event.description ?: "")
-            })
+        events.sortedBy { it.startAtMillis }.forEach { event ->
+            arr.put(eventToJson(event))
         }
-        prefs(context).edit().putString(KEY_EVENTS, arr.toString()).apply()
-        cachedEvents = sortedEvents
-        clearDoneForMissingEvents(context, sortedEvents.map { it.id }.toSet())
+        return arr
     }
 
     fun getKnownIds(context: Context): MutableSet<String> {
@@ -501,6 +568,7 @@ object EventStore {
         listOf(
             KEY_ICAL_URL,
             KEY_EVENTS,
+            KEY_PERSONAL_EVENTS,
             KEY_LAST_SYNC,
             KEY_DAILY_SUMMARY_ENABLED,
             KEY_DAILY_SUMMARY_TOUCHED,
@@ -546,10 +614,15 @@ object EventStore {
             put("sourceUrl", event.sourceUrl ?: "")
             put("rawType", event.rawType ?: "")
             put("description", event.description ?: "")
+            put("source", event.source.name)
         }
     }
 
     private fun pendingEventFromJson(obj: JSONObject): DeadlineEvent? {
+        return eventFromJson(obj, DeadlineSource.MOODLE)
+    }
+
+    private fun eventFromJson(obj: JSONObject, defaultSource: DeadlineSource): DeadlineEvent? {
         val id = obj.optString("id").takeIf { it.isNotBlank() } ?: return null
         val title = obj.optString("title").takeIf { it.isNotBlank() } ?: return null
         val startAtMillis = obj.optLong("startAtMillis", 0L)
@@ -560,7 +633,8 @@ object EventStore {
             startAtMillis = startAtMillis,
             sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() },
             rawType = obj.optString("rawType").takeIf { it.isNotBlank() },
-            description = obj.optString("description").takeIf { it.isNotBlank() }
+            description = obj.optString("description").takeIf { it.isNotBlank() },
+            source = DeadlineSource.fromStored(obj.optString("source").takeIf { it.isNotBlank() } ?: defaultSource.name)
         )
     }
 

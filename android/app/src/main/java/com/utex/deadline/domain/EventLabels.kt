@@ -15,6 +15,7 @@ object EventLabels {
     private val viLocale = Locale.forLanguageTag("vi-VN")
 
     fun kind(event: DeadlineEvent): String {
+        if (event.isPersonal) return "Cá nhân"
         val title = searchable(event.title)
         return when (group(event)) {
             EventGroup.SUBMISSION -> "Bài nộp"
@@ -30,6 +31,7 @@ object EventLabels {
     }
 
     fun group(event: DeadlineEvent): EventGroup {
+        if (event.isPersonal) return EventGroup.DEADLINE
         val text = searchable("${event.title} ${event.description.orEmpty()} ${event.rawType.orEmpty()}")
         return when {
             containsAny(text, "nop", "bai nop", "assignment", "lab", "tieu luan", "project") -> EventGroup.SUBMISSION
@@ -59,6 +61,7 @@ object EventLabels {
     }
 
     fun course(event: DeadlineEvent): String? {
+        if (event.isPersonal) return "Cá nhân"
         return event.rawType
             ?.trim()
             ?.takeIf { it.isNotBlank() }

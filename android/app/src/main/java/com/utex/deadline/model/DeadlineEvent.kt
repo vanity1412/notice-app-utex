@@ -1,13 +1,28 @@
 package com.utex.deadline
 
+enum class DeadlineSource {
+    MOODLE,
+    PERSONAL;
+
+    companion object {
+        fun fromStored(value: String?): DeadlineSource {
+            return values().firstOrNull { it.name.equals(value.orEmpty(), ignoreCase = true) } ?: MOODLE
+        }
+    }
+}
+
 data class DeadlineEvent(
     val id: String,
     val title: String,
     val startAtMillis: Long,
     val sourceUrl: String? = null,
     val rawType: String? = null,
-    val description: String? = null
-)
+    val description: String? = null,
+    val source: DeadlineSource = DeadlineSource.MOODLE
+) {
+    val isMoodle: Boolean get() = source == DeadlineSource.MOODLE
+    val isPersonal: Boolean get() = source == DeadlineSource.PERSONAL
+}
 
 data class SyncResult(
     val ok: Boolean,

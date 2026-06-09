@@ -3,6 +3,7 @@ package com.utex.deadline
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 
 class DeadlineAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -34,7 +35,8 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
             startAtMillis = startAt,
             sourceUrl = intent.getStringExtra(EXTRA_SOURCE_URL)?.takeIf { it.isNotBlank() },
             rawType = intent.getStringExtra(EXTRA_RAW_TYPE)?.takeIf { it.isNotBlank() },
-            description = intent.getStringExtra(EXTRA_DESCRIPTION)?.takeIf { it.isNotBlank() }
+            description = intent.getStringExtra(EXTRA_DESCRIPTION)?.takeIf { it.isNotBlank() },
+            source = DeadlineSource.fromStored(intent.getStringExtra(EXTRA_SOURCE))
         )
 
         if (EventStore.isDone(context, event.id)) {
@@ -43,32 +45,31 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
 
         val reminderKey = intent.getStringExtra(EXTRA_REMINDER_KEY)
             ?: "reminder-${event.id}-${event.startAtMillis}-$leadMinutes"
-        if (!EventStore.tryMarkNotificationDelivery(context, reminderKey)) {
-            return
-        }
-
         val leadText = intent.getStringExtra(EXTRA_LEAD_TEXT) ?: EventStore.reminderLeadLabel(leadMinutes)
-        val sent = NotificationHelper.notifyReminder(context, event, leadText, leadMinutes)
-        if (!sent && !NotificationHelper.canPostNotifications(context)) {
-            EventStore.upsertPendingDeadlineNotifications(
-                context,
-                listOf(
-                    PendingDeadlineNotification(
-                        key = "reminder-${event.id}-$leadMinutes",
-                        type = "reminder",
-                        event = event,
-                        timestamp = now,
-                        leadText = leadText,
-                        leadMinutes = leadMinutes
+
+        // Notification và email dùng key riêng.
+        // Không return khi notification key đã tồn tại, vì WorkManager backup có thể đã bắn notification
+        // nhưng chưa gửi email. Email vẫn cần được xét bằng emailKey riêng để gửi đúng 1 lần.
+        if (EventStore.tryMarkNotificationDelivery(context, reminderKey)) {
+            val sent = NotificationHelper.notifyReminder(context, event, leadText, leadMinutes)
+            if (!sent && !NotificationHelper.canPostNotifications(context)) {
+                EventStore.upsertPendingDeadlineNotifications(
+                    context,
+                    listOf(
+                        PendingDeadlineNotification(
+                            key = reminderKey,
+                            type = "reminder",
+                            event = event,
+                            timestamp = now,
+                            leadText = leadText,
+                            leadMinutes = leadMinutes
+                        )
                     )
                 )
-            )
+            }
         }
-        
-        // Gửi email reminder nếu được bật
-        if (EventStore.isEmailNotificationEnabled(context)) {
-            EmailNotificationService.sendReminderEmail(context, event, leadText) { _, _ -> }
-        }
+
+        sendReminderEmailOnce(context, event, leadText, reminderKey)
     }
 
     private fun handleDailySummary(context: Context) {
@@ -76,6 +77,7 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
             val events = EventStore.loadEvents(context)
             if (NotificationHelper.hasUpcomingDailySummary(context, events)) {
                 val deliveryKey = dailySummaryDeliveryKey(context)
+
                 if (EventStore.tryMarkNotificationDelivery(context, deliveryKey)) {
                     val sent = NotificationHelper.notifyDailySummary(context, events)
                     if (!sent && !NotificationHelper.canPostNotifications(context)) {
@@ -96,15 +98,39 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
                             )
                         )
                     }
-                    
-                    // Gửi email daily summary nếu được bật
-                    if (EventStore.isEmailNotificationEnabled(context)) {
-                        EmailNotificationService.sendDailySummaryEmail(context, events) { _, _ -> }
-                    }
                 }
+
+                sendDailySummaryEmailOnce(context, events, deliveryKey)
             }
         }
         ReminderScheduler.scheduleDailySummary(context)
+    }
+
+    private fun sendReminderEmailOnce(
+        context: Context,
+        event: DeadlineEvent,
+        leadText: String,
+        reminderKey: String
+    ) {
+        if (!EventStore.isEmailNotificationEnabled(context)) return
+
+        val emailKey = "email-$reminderKey"
+        if (!EventStore.tryMarkNotificationDelivery(context, emailKey)) return
+
+        EmailNotificationService.sendReminderEmail(context, event, leadText) { success, message ->
+            Log.i(TAG, "Reminder email result: success=$success, message=$message")
+        }
+    }
+
+    private fun sendDailySummaryEmailOnce(context: Context, events: List<DeadlineEvent>, deliveryKey: String) {
+        if (!EventStore.isEmailNotificationEnabled(context)) return
+
+        val emailKey = "email-$deliveryKey"
+        if (!EventStore.tryMarkNotificationDelivery(context, emailKey)) return
+
+        EmailNotificationService.sendDailySummaryEmail(context, events) { success, message ->
+            Log.i(TAG, "Daily summary email result: success=$success, message=$message")
+        }
     }
 
     private fun dailySummaryDeliveryKey(context: Context): String {
@@ -115,6 +141,8 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private const val TAG = "DeadlineAlarmReceiver"
+
         const val ACTION_REMINDER = "com.utex.deadline.action.REMINDER"
         const val ACTION_DAILY_SUMMARY = "com.utex.deadline.action.DAILY_SUMMARY"
 
@@ -124,6 +152,7 @@ class DeadlineAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_SOURCE_URL = "sourceUrl"
         const val EXTRA_RAW_TYPE = "rawType"
         const val EXTRA_DESCRIPTION = "description"
+        const val EXTRA_SOURCE = "source"
         const val EXTRA_LEAD_TEXT = "leadText"
         const val EXTRA_LEAD_MINUTES = "leadMinutes"
         const val EXTRA_REMINDER_KEY = "reminderKey"

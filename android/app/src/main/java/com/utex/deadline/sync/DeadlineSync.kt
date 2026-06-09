@@ -32,9 +32,9 @@ object DeadlineSync {
                 )
             }
 
-            val events = IcsParser.parse(ics)
+            val events = IcsParser.parse(ics).map { it.copy(source = DeadlineSource.MOODLE) }
             val knownIds = EventStore.getKnownIds(context)
-            val previousEvents = EventStore.loadEvents(context)
+            val previousEvents = EventStore.loadMoodleEvents(context)
             val firstSync = knownIds.isEmpty()
             val now = System.currentTimeMillis()
             
@@ -53,12 +53,12 @@ object DeadlineSync {
                 }
             } else emptyList()
 
-            EventStore.saveEvents(context, events)
+            EventStore.saveMoodleEvents(context, events)
             EventStore.saveKnownIds(context, knownIds + events.map { it.id })
             EventStore.setLastSync(context, System.currentTimeMillis())
 
             EventStore.prepareDailySummaryAfterSetup(context)
-            ReminderScheduler.scheduleAll(context, events.filterNot { EventStore.isDone(context, it.id) })
+            ReminderScheduler.scheduleAll(context, EventStore.loadAllEvents(context).filterNot { EventStore.isDone(context, it.id) })
             ReminderScheduler.scheduleDailySummary(context)
 
             if (notifyNew) {
