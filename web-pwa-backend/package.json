@@ -1,0 +1,21 @@
+{
+  "name": "ute-notice-web-pwa-backend",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "shared",
+    "backend",
+    "pwa"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:pwa": "npm run dev -w pwa",
+    "build": "npm run build -w shared && npm run build -w backend && npm run build -w pwa",
+    "test": "npm run test -w shared && npm run test -w backend --if-present",
+    "generate:vapid": "npm run generate:vapid -w backend"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.8"
+  }
+}
