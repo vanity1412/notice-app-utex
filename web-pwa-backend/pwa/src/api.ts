@@ -1,6 +1,8 @@
 import type { AppSnapshot, UserSettings } from "@ute-notice/shared";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787/api";
+const LOCAL_API_BASE = "http://localhost:8787/api";
+const PRODUCTION_API_BASE = "https://hcmute-notice-backend.onrender.com/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? PRODUCTION_API_BASE : LOCAL_API_BASE);
 const SESSION_KEY = "ute-notice-web-session";
 
 export interface Session {
