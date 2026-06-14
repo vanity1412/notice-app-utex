@@ -1,9 +1,37 @@
+const CACHE_NAME = "ute-notice-shell-v1";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/hcmute_logo.png"];
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL))
+      .catch(() => undefined)
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/").then((response) => response || Response.error())));
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || !APP_SHELL.includes(url.pathname)) return;
+
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request).then((response) => response || Response.error())));
 });
 
 self.addEventListener("push", (event) => {

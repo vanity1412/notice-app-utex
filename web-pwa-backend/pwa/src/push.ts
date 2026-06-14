@@ -5,6 +5,13 @@ export function isPushSupported(): boolean {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }
 
+export async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator)) return null;
+  const registration = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.ready;
+  return registration;
+}
+
 export async function enableWebPush(publicKey: string): Promise<AppSnapshot> {
   if (!isPushSupported()) {
     throw new Error("Trình duyệt này chưa hỗ trợ Web Push.");
@@ -15,8 +22,10 @@ export async function enableWebPush(publicKey: string): Promise<AppSnapshot> {
     throw new Error("Bạn chưa cấp quyền thông báo.");
   }
 
-  const registration = await navigator.serviceWorker.register("/sw.js");
-  await navigator.serviceWorker.ready;
+  const registration = await ensureServiceWorker();
+  if (!registration) {
+    throw new Error("Trình duyệt này chưa hỗ trợ service worker.");
+  }
 
   const existing = await registration.pushManager.getSubscription();
   const subscription =

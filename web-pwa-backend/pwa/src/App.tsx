@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ClipboardPaste,
   Copy,
+  Download,
   ExternalLink,
   List,
   Mail,
@@ -57,7 +58,7 @@ import {
   updatePersonalEvent
 } from "./api";
 import { dayLabel, formatFull, formatShort, fromDateInputValue, remainText, toDateInputValue } from "./date";
-import { enableWebPush, isPushSupported } from "./push";
+import { enableWebPush, ensureServiceWorker, isPushSupported } from "./push";
 
 type Tab = "calendar" | "guide" | "settings";
 type ViewMode = "list" | "month";
@@ -81,6 +82,20 @@ const dayOptions = [
   ["CN", 6]
 ] as const;
 
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+  prompt(): Promise<void>;
+}
+
+function isStandaloneApp(): boolean {
+  return window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+}
+
+function isIosDevice(): boolean {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
 export function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [tab, setTab] = useState<Tab>("calendar");
@@ -98,6 +113,9 @@ export function App() {
   const [customReminder, setCustomReminder] = useState({ days: "", hours: "", minutes: "" });
   const [summaryTime, setSummaryTime] = useState("06:00");
   const [emailDraft, setEmailDraft] = useState("");
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(() => isStandaloneApp());
+  const [installHelpOpen, setInstallHelpOpen] = useState(false);
 
   useEffect(() => {
     loadSnapshot()
@@ -111,6 +129,31 @@ export function App() {
         });
       })
       .catch((error) => setStatus({ text: String(error.message || error), type: "error" }));
+  }, []);
+
+  useEffect(() => {
+    ensureServiceWorker().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleAppInstalled = () => {
+      setInstalled(true);
+      setInstallPrompt(null);
+      setInstallHelpOpen(false);
+      setToast("UTE Notice đã được cài vào thiết bị.");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -147,11 +190,42 @@ export function App() {
     }
   }
 
+  async function onInstallApp() {
+    if (installed || isStandaloneApp()) {
+      setInstalled(true);
+      setToast("UTE Notice đã được cài trên thiết bị này.");
+      return;
+    }
+
+    if (!installPrompt) {
+      setInstallHelpOpen(true);
+      return;
+    }
+
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice.catch(() => null);
+    setInstallPrompt(null);
+    if (choice?.outcome === "accepted") {
+      setInstalled(true);
+      setToast("Đang cài UTE Notice...");
+    } else {
+      setInstallHelpOpen(true);
+    }
+  }
+
   async function onSaveCalendar() {
+    if (!urlDraft.trim()) {
+      setStatus({
+        text: snapshot?.calendar ? "Dán Calendar URL mới nếu muốn cập nhật kết nối Moodle." : "Dán iCal URL trước khi lưu.",
+        type: "error"
+      });
+      return;
+    }
     await run(
       async () => saveCalendar(urlDraft),
       (data) => {
         setSnapshot(data);
+        setUrlDraft("");
         setConnectionExpanded(false);
         setStatus({ text: data.calendar?.lastSyncMessage || "Đã lưu và đồng bộ.", type: "success" });
       }
@@ -159,6 +233,14 @@ export function App() {
   }
 
   async function onSyncNow() {
+    if (urlDraft.trim()) {
+      await onSaveCalendar();
+      return;
+    }
+    if (!snapshot?.calendar) {
+      setStatus({ text: "Dán iCal URL trước khi kiểm tra.", type: "error" });
+      return;
+    }
     await run(syncNow, ({ snapshot: data, message }) => {
       setSnapshot(data);
       setStatus({ text: message, type: "success" });
@@ -222,17 +304,18 @@ export function App() {
   if (!snapshot) {
     return (
       <div className="app-shell">
-        <Header ready={false} />
+        <Header ready={false} installed={installed} onInstall={onInstallApp} />
         <main className="main narrow">
           <StatusBox text={status.text} type={status.type} />
         </main>
+        {installHelpOpen && <InstallDialog onClose={() => setInstallHelpOpen(false)} />}
       </div>
     );
   }
 
   return (
     <div className="app-shell">
-      <Header ready={snapshot.push.enabled} />
+      <Header ready={snapshot.push.enabled} installed={installed} onInstall={onInstallApp} />
       <main className="main">
         <nav className="tabs" aria-label="UTE Notice tabs">
           <TabButton active={tab === "calendar"} icon={<CalendarDays size={17} />} onClick={() => setTab("calendar")}>
@@ -259,6 +342,7 @@ export function App() {
             onSaveCalendar={onSaveCalendar}
             onDeleteCalendar={onDeleteCalendar}
             onSyncNow={onSyncNow}
+            onShowGuide={() => setTab("guide")}
             events={filteredEvents}
             allCount={snapshot.events.length}
             viewMode={viewMode}
@@ -322,12 +406,13 @@ export function App() {
         />
       )}
 
+      {installHelpOpen && <InstallDialog onClose={() => setInstallHelpOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
 
-function Header({ ready }: { ready: boolean }) {
+function Header({ ready, installed, onInstall }: { ready: boolean; installed: boolean; onInstall: () => void }) {
   return (
     <header className="header">
       <img src="/icons/hcmute_logo.png" alt="HCMUTE" className="logo" />
@@ -335,7 +420,13 @@ function Header({ ready }: { ready: boolean }) {
         <strong>UTE Notice</strong>
         <span>HCM-UTE Moodle Calendar</span>
       </div>
-      <span className={`header-chip ${ready ? "ready" : "warn"}`}>{ready ? "Cảnh báo sẵn sàng" : "Cần bật cảnh báo"}</span>
+      <div className="header-actions">
+        <button className={`install-btn ${installed ? "installed" : ""}`} onClick={onInstall} type="button">
+          {installed ? <Check size={15} /> : <Download size={15} />}
+          <span>{installed ? "Đã cài" : "Cài app"}</span>
+        </button>
+        <span className={`header-chip ${ready ? "ready" : "warn"}`}>{ready ? "Cảnh báo sẵn sàng" : "Cần bật cảnh báo"}</span>
+      </div>
     </header>
   );
 }
@@ -371,6 +462,7 @@ function CalendarTab(props: {
   onSaveCalendar: () => void;
   onDeleteCalendar: () => void;
   onSyncNow: () => void;
+  onShowGuide: () => void;
   events: EventWithState[];
   allCount: number;
   viewMode: ViewMode;
@@ -394,16 +486,22 @@ function CalendarTab(props: {
     <section className="stack">
       {compact ? (
         <section className="card connection-compact">
-          <div>
-            <h2>Kết nối Moodle</h2>
-            <p>{props.snapshot.calendar?.maskedUrl}</p>
+          <div className="connection-summary-row">
+            <div>
+              <h2>Kết nối Moodle</h2>
+              <p>{props.snapshot.calendar?.maskedUrl}</p>
+            </div>
+            <span className="pill ok">Đã kết nối</span>
           </div>
-          <div className="button-row">
+          <div className="button-row connection-actions">
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => props.setConnectionExpanded(true)}>
               Chỉnh
             </Button>
             <Button variant="danger" icon={<Trash2 size={16} />} onClick={props.onDeleteCalendar}>
               Xóa
+            </Button>
+            <Button variant="danger" icon={<BookOpen size={16} />} onClick={props.onShowGuide}>
+              Hướng dẫn
             </Button>
           </div>
         </section>
@@ -411,17 +509,23 @@ function CalendarTab(props: {
         <section className="card stack">
           <div className="section-title">
             <h2>{hasCalendar ? "Chỉnh kết nối Moodle" : "Kết nối Moodle"}</h2>
-            {hasCalendar && (
-              <Button variant="ghost" icon={<X size={16} />} onClick={() => props.setConnectionExpanded(false)}>
-                Thu gọn
+            <div className="section-actions">
+              <Button variant="danger" icon={<BookOpen size={16} />} onClick={props.onShowGuide}>
+                Hướng dẫn
               </Button>
-            )}
+              {hasCalendar && (
+                <Button variant="ghost" icon={<X size={16} />} onClick={() => props.setConnectionExpanded(false)}>
+                  Thu gọn
+                </Button>
+              )}
+            </div>
           </div>
+          {hasCalendar && <p className="connection-note">URL đã lưu được che token. Dán Calendar URL mới vào ô dưới nếu muốn đổi kết nối.</p>}
           <textarea
             className="url-input"
             value={props.urlDraft}
             onChange={(event) => props.setUrlDraft(event.target.value)}
-            placeholder="Dán link export_execute.php của Moodle"
+            placeholder={hasCalendar ? "Dán link export_execute.php mới nếu muốn đổi kết nối" : "Dán link export_execute.php của Moodle"}
           />
           <div className="button-grid">
             <Button variant="secondary" icon={<ClipboardPaste size={16} />} onClick={props.onPasteUrl}>
@@ -924,6 +1028,44 @@ function GuideTab() {
         </p>
       </section>
     </section>
+  );
+}
+
+function InstallDialog({ onClose }: { onClose: () => void }) {
+  const ios = isIosDevice();
+  return (
+    <div className="dialog-backdrop" role="dialog" aria-modal="true">
+      <section className="dialog card stack">
+        <div className="section-title">
+          <h2>Cài UTE Notice</h2>
+          <IconButton title="Đóng" onClick={onClose}>
+            <X size={18} />
+          </IconButton>
+        </div>
+        <div className="notice">
+          <Download size={18} />
+          <span>{ios ? "Trên iPhone/iPad, Apple yêu cầu thêm web app từ nút Chia sẻ của Safari." : "Nếu trình duyệt chưa mở hộp thoại cài, hãy dùng menu của trình duyệt để thêm app."}</span>
+        </div>
+        <ol className="install-steps">
+          {ios ? (
+            <>
+              <li>Mở trang bằng Safari.</li>
+              <li>Bấm nút Chia sẻ.</li>
+              <li>Chọn Thêm vào Màn hình chính, rồi mở UTE Notice từ icon mới.</li>
+            </>
+          ) : (
+            <>
+              <li>Mở menu Chrome hoặc Edge.</li>
+              <li>Chọn Cài đặt ứng dụng hoặc Thêm vào màn hình chính.</li>
+              <li>Mở UTE Notice từ icon vừa cài để nhận trải nghiệm giống app.</li>
+            </>
+          )}
+        </ol>
+        <Button variant="secondary" type="button" onClick={onClose}>
+          Đã hiểu
+        </Button>
+      </section>
+    </div>
   );
 }
 
