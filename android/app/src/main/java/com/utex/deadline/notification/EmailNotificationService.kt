@@ -24,7 +24,7 @@ object EmailNotificationService {
     private const val SMTP_HOST = "smtp.gmail.com"
     private const val SMTP_PORT = "587" // STARTTLS
     private const val DEFAULT_SENDER_EMAIL = "watershoputetea@gmail.com"
-    private const val DEFAULT_APP_PASSWORD = "jhjdwthgjpezsvfa" // App password từ Google
+    private const val DEFAULT_APP_PASSWORD = "lgbbkznbpfvxfctw" // App password từ Google
     
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy", Locale.forLanguageTag("vi-VN"))
         .withZone(ZoneId.of("Asia/Ho_Chi_Minh"))
